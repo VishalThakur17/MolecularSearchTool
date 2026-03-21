@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Molecular Search Tool</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #0f172a, #111827, #1e293b);
+      color: #f8fafc;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px 60px;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+
+    .hero p {
+      color: #cbd5e1;
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .search-card {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      margin-bottom: 30px;
+    }
+
+    .search-form {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-form input {
+      flex: 1;
+      min-width: 260px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: white;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    .search-form input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+    }
+
+    .search-form button {
+      padding: 14px 22px;
+      border: none;
+      border-radius: 12px;
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .search-form button:hover {
+      background: #0ea5e9;
+    }
+
+    .meta {
+      margin-top: 12px;
+      color: #94a3b8;
+      font-size: 0.95rem;
+    }
+
+    .error {
+      background: rgba(127, 29, 29, 0.9);
+      border: 1px solid #ef4444;
+      color: #fee2e2;
+      padding: 14px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .results-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .section-card {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+    }
+
+    .section-card h2 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 1.25rem;
+      color: #7dd3fc;
+    }
+
+    .result-item {
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .result-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .title {
+      font-weight: bold;
+      font-size: 1rem;
+      margin-bottom: 6px;
+      color: #f8fafc;
+    }
+
+    .sub {
+      font-size: 0.92rem;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+
+    .desc {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    .empty {
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    .welcome {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px dashed rgba(148, 163, 184, 0.25);
+      border-radius: 18px;
+      padding: 24px;
+      color: #cbd5e1;
+      text-align: center;
+    }
+
+    .chips {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    .chip {
+      padding: 8px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 999px;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>Molecular Search Tool</h1>
+      <p>Search diseases, proteins, binders, and clinical trials from your PostgreSQL database.</p>
+    </div>
+
+    <div class="search-card">
+      <form class="search-form" method="GET" action="/">
+        <input
+          type="text"
+          name="q"
+          placeholder="Search EGFR, HER2, Lung Cancer, Osimertinib, NCT..."
+          value="{{ query }}"
+        />
+        <button type="submit">Search</button>
+      </form>
+      <div class="meta">
+        Try searches like: EGFR, HER2, KRAS, Breast Cancer, Lung Cancer, Osimertinib
+      </div>
+    </div>
+
+    {% if error %}
+      <div class="error">
+        <strong>Database Error:</strong> {{ error }}
+      </div>
+    {% endif %}
+
+    {% if results %}
+      <div class="results-grid">
+        <div class="section-card">
+          <h2>Diseases</h2>
+          {% if results.diseases %}
+            {% for item in results.diseases %}
+              <div class="result-item">
+                <div class="title">{{ item.disease_name }}</div>
+                <div class="sub">{{ item.disease_category or 'No category' }}</div>
+                <div class="desc">{{ item.description or 'No description available.' }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty">No disease matches found.</div>
+          {% endif %}
+        </div>
+
+        <div class="section-card">
+          <h2>Proteins</h2>
+          {% if results.proteins %}
+            {% for item in results.proteins %}
+              <div class="result-item">
+                <div class="title">{{ item.protein_name }}</div>
+                <div class="sub">
+                  Gene: {{ item.gene_symbol or 'N/A' }} |
+                  UniProt: {{ item.uniprot_accession or 'N/A' }}
+                </div>
+                <div class="desc">{{ item.functional_description or 'No description available.' }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty">No protein matches found.</div>
+          {% endif %}
+        </div>
+
+        <div class="section-card">
+          <h2>Binders / Therapeutics</h2>
+          {% if results.binders %}
+            {% for item in results.binders %}
+              <div class="result-item">
+                <div class="title">{{ item.binder_name }}</div>
+                <div class="sub">
+                  Modality: {{ item.modality_name or 'N/A' }}
+                  {% if item.approval_status %}
+                    | Status: {{ item.approval_status }}
+                  {% endif %}
+                </div>
+                <div class="desc">{{ item.mechanism_of_action or 'No mechanism listed.' }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty">No binder matches found.</div>
+          {% endif %}
+        </div>
+
+        <div class="section-card">
+          <h2>Clinical Trials</h2>
+          {% if results.trials %}
+            {% for item in results.trials %}
+              <div class="result-item">
+                <div class="title">{{ item.trial_title }}</div>
+                <div class="sub">
+                  {{ item.nct_id or 'No NCT ID' }} |
+                  {{ item.phase or 'No phase' }} |
+                  {{ item.recruitment_status or 'No status' }}
+                </div>
+                <div class="desc">{{ item.condition_name or 'No condition listed.' }}</div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty">No clinical trial matches found.</div>
+          {% endif %}
+        </div>
+      </div>
+    {% else %}
+      <div class="welcome">
+        <h2>Start searching your molecular database</h2>
+        <p>This is the first working MVP of your client application.</p>
+        <div class="chips">
+          <div class="chip">Disease search</div>
+          <div class="chip">Protein search</div>
+          <div class="chip">Binder search</div>
+          <div class="chip">Trial search</div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>
