@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ trial.trial_title }} - Molecular Search Tool</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #f7fbff; color: #0f172a; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px 50px; }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: bold; }
+    .hero, .card { background: white; border: 1px solid #dbeafe; border-radius: 20px; padding: 24px; box-shadow: 0 10px 30px rgba(96,165,250,0.10); }
+    .hero { margin: 20px 0 22px; }
+    .title { font-size: 2rem; font-weight: bold; margin-bottom: 10px; }
+    .sub { color: #516277; margin-bottom: 16px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 8px 12px; border-radius: 999px; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card h2 { margin-top: 0; }
+    .list-item { border: 1px solid #e0f2fe; background: #f8fbff; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .list-item a { color: #1d4ed8; text-decoration: none; font-weight: bold; }
+    .meta-row { margin-bottom: 10px; color: #334155; }
+    .empty { color: #64748b; font-style: italic; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back-link" href="/">← Back to search</a>
+
+    <div class="hero">
+      <div class="title">{{ trial.trial_title }}</div>
+      <div class="sub">{{ trial.brief_summary or (trial.condition_name or 'No summary available.') }}</div>
+      <div class="chips">
+        <div class="chip">Clinical Trial</div>
+        <div class="chip">{{ trial.nct_id or 'No NCT ID' }}</div>
+        <div class="chip">{{ trial.phase or 'No phase' }}</div>
+        <div class="chip">{{ trial.recruitment_status or 'No status' }}</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Trial Metadata</h2>
+        <div class="meta-row"><strong>NCT ID:</strong> {{ trial.nct_id or 'N/A' }}</div>
+        <div class="meta-row"><strong>Condition:</strong> {{ trial.condition_name or 'N/A' }}</div>
+        <div class="meta-row"><strong>Phase:</strong> {{ trial.phase or 'N/A' }}</div>
+        <div class="meta-row"><strong>Status:</strong> {{ trial.recruitment_status or 'N/A' }}</div>
+        <div class="meta-row"><strong>Study Type:</strong> {{ trial.study_type or 'N/A' }}</div>
+        <div class="meta-row"><strong>Sponsor:</strong> {{ trial.sponsor_name or 'N/A' }}</div>
+        <div class="meta-row"><strong>Start Date:</strong> {{ trial.start_date or 'N/A' }}</div>
+        <div class="meta-row"><strong>Completion Date:</strong> {{ trial.completion_date or 'N/A' }}</div>
+        <div class="meta-row">
+          <strong>Trial URL:</strong>
+          {% if trial.trial_url %}
+            <a href="{{ trial.trial_url }}" target="_blank">{{ trial.trial_url }}</a>
+          {% else %}
+            N/A
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Linked Diseases</h2>
+        {% if diseases %}
+          {% for item in diseases %}
+            <div class="list-item">
+              <a href="{{ url_for('disease_detail', disease_id=item.disease_id) }}">{{ item.disease_name }}</a>
+              <div>{{ item.disease_category or 'No category' }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty">No linked diseases found.</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>Linked Therapeutics</h2>
+        {% if binders %}
+          {% for item in binders %}
+            <div class="list-item">
+              <a href="{{ url_for('binder_detail', binder_id=item.binder_id) }}">{{ item.binder_name }}</a>
+              <div>{{ item.modality_name or 'No modality' }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty">No linked binders found.</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>Linked Proteins</h2>
+        {% if proteins %}
+          {% for item in proteins %}
+            <div class="list-item">
+              <a href="{{ url_for('protein_detail', protein_id=item.protein_id) }}">{{ item.protein_name }}</a>
+              <div>{{ item.gene_symbol or 'No gene symbol' }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty">No linked proteins found.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

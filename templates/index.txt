@@ -703,17 +703,6 @@
       line-height: 1.35;
     }
 
-    .result-title a {
-      color: inherit;
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
-
-    .result-title a:hover {
-      color: var(--blue-deep);
-      text-decoration: underline;
-    }
-
     .badges {
       display: flex;
       flex-wrap: wrap;
@@ -1179,9 +1168,7 @@
                         <div class="result-card">
                           <div class="result-top">
                             <div class="result-title-wrap">
-                              <div class="result-title">
-                                <a href="{{ url_for('disease_detail', disease_id=item.disease_id) }}">{{ item.disease_name }}</a>
-                              </div>
+                              <div class="result-title">{{ item.disease_name }}</div>
                               <div class="badges">
                                 <div class="badge badge-blue">Disease</div>
                                 <div class="badge">{{ item.disease_category or 'Uncategorized' }}</div>
@@ -1233,9 +1220,7 @@
                         <div class="result-card">
                           <div class="result-top">
                             <div class="result-title-wrap">
-                              <div class="result-title">
-                                <a href="{{ url_for('protein_detail', protein_id=item.protein_id) }}">{{ item.protein_name }}</a>
-                              </div>
+                              <div class="result-title">{{ item.protein_name }}</div>
                               <div class="badges">
                                 <div class="badge badge-blue">Protein Target</div>
                                 {% if item.gene_symbol %}
@@ -1292,9 +1277,7 @@
                         <div class="result-card">
                           <div class="result-top">
                             <div class="result-title-wrap">
-                              <div class="result-title">
-                                <a href="{{ url_for('binder_detail', binder_id=item.binder_id) }}">{{ item.binder_name }}</a>
-                              </div>
+                              <div class="result-title">{{ item.binder_name }}</div>
                               <div class="badges">
                                 <div class="badge badge-green">Therapeutic</div>
                                 <div class="badge">{{ item.modality_name or 'Unknown modality' }}</div>
@@ -1349,9 +1332,7 @@
                         <div class="result-card">
                           <div class="result-top">
                             <div class="result-title-wrap">
-                              <div class="result-title">
-                                <a href="{{ url_for('trial_detail', trial_id=item.trial_id) }}">{{ item.trial_title }}</a>
-                              </div>
+                              <div class="result-title">{{ item.trial_title }}</div>
                               <div class="badges">
                                 <div class="badge badge-blue">Clinical Trial</div>
                                 {% if item.nct_id %}

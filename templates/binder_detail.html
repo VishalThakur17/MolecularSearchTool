@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ binder.binder_name }} - Molecular Search Tool</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #f7fbff; color: #0f172a; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px 50px; }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: bold; }
+    .hero, .card { background: white; border: 1px solid #dbeafe; border-radius: 20px; padding: 24px; box-shadow: 0 10px 30px rgba(96,165,250,0.10); }
+    .hero { margin: 20px 0 22px; }
+    .title { font-size: 2rem; font-weight: bold; margin-bottom: 10px; }
+    .sub { color: #516277; margin-bottom: 16px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 8px 12px; border-radius: 999px; font-size: 0.9rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card h2 { margin-top: 0; }
+    .list-item { border: 1px solid #e0f2fe; background: #f8fbff; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .list-item a { color: #1d4ed8; text-decoration: none; font-weight: bold; }
+    .meta-row { margin-bottom: 10px; color: #334155; }
+    .empty { color: #64748b; font-style: italic; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back-link" href="/">← Back to search</a>
+
+    <div class="hero">
+      <div class="title">{{ binder.binder_name }}</div>
+      <div class="sub">{{ binder.mechanism_of_action or 'No mechanism available.' }}</div>
+      <div class="chips">
+        <div class="chip">Therapeutic Binder</div>
+        <div class="chip">Modality: {{ binder.modality_name or 'N/A' }}</div>
+        <div class="chip">Status: {{ binder.approval_status or 'Not listed' }}</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Binder Metadata</h2>
+        <div class="meta-row"><strong>Name:</strong> {{ binder.binder_name }}</div>
+        <div class="meta-row"><strong>Modality:</strong> {{ binder.modality_name or 'N/A' }}</div>
+        <div class="meta-row"><strong>Approval Status:</strong> {{ binder.approval_status or 'N/A' }}</div>
+        <div class="meta-row"><strong>Developer Company:</strong> {{ binder.developer_company or 'N/A' }}</div>
+        <div class="meta-row"><strong>Description:</strong> {{ binder.binder_description or 'N/A' }}</div>
+      </div>
+
+      <div class="card">
+        <h2>Linked Proteins</h2>
+        {% if proteins %}
+          {% for item in proteins %}
+            <div class="list-item">
+              <a href="{{ url_for('protein_detail', protein_id=item.protein_id) }}">{{ item.protein_name }}</a>
+              <div>{{ item.gene_symbol or 'No gene symbol' }}{% if item.interaction_type %} • {{ item.interaction_type }}{% endif %}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty">No linked proteins found.</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>Linked Clinical Trials</h2>
+        {% if trials %}
+          {% for item in trials %}
+            <div class="list-item">
+              <a href="{{ url_for('trial_detail', trial_id=item.trial_id) }}">{{ item.trial_title }}</a>
+              <div>{{ item.nct_id or 'No NCT ID' }} • {{ item.phase or 'No phase' }}</div>
+              <div>{{ item.recruitment_status or 'No status' }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty">No linked trials found.</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>Structures</h2>
+        {% if structures %}
+          {% for item in structures %}
+            <div class="list-item">
+              <div><strong>PDB ID:</strong> {{ item.pdb_id or 'N/A' }}</div>
+              <div>{{ item.structure_title or 'No title' }}</div>
+              <div>{{ item.experimental_method or 'No method' }}{% if item.resolution %} • Resolution: {{ item.resolution }}{% endif %}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty">No linked structures found.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
