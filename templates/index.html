@@ -5,306 +5,1408 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Molecular Search Tool</title>
   <style>
+    :root {
+      --bg: #f7fbff;
+      --bg-2: #eef7ff;
+      --panel: rgba(255, 255, 255, 0.96);
+      --panel-solid: #ffffff;
+      --panel-2: #f8fcff;
+      --line: rgba(96, 165, 250, 0.14);
+      --line-strong: rgba(96, 165, 250, 0.26);
+      --text: #0f172a;
+      --muted: #516277;
+      --muted-2: #6f85a0;
+      --blue: #60a5fa;
+      --blue-soft: #dbeafe;
+      --blue-soft-2: #eaf4ff;
+      --blue-deep: #2563eb;
+      --cyan-soft: #f0f9ff;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --shadow: 0 16px 44px rgba(96, 165, 250, 0.14);
+      --radius: 22px;
+      --radius-sm: 14px;
+      --max: 1380px;
+    }
+
     * {
       box-sizing: border-box;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background: linear-gradient(135deg, #0f172a, #111827, #1e293b);
-      color: #f8fafc;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(191, 219, 254, 0.45), transparent 28%),
+        radial-gradient(circle at top right, rgba(219, 234, 254, 0.5), transparent 28%),
+        linear-gradient(180deg, #fcfeff 0%, #f7fbff 52%, #eef7ff 100%);
+      color: var(--text);
       min-height: 100vh;
     }
 
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .page-shell {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bg-orb {
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(90px);
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .orb-1 {
+      width: 260px;
+      height: 260px;
+      background: #dbeafe;
+      top: 100px;
+      left: -40px;
+    }
+
+    .orb-2 {
+      width: 320px;
+      height: 320px;
+      background: #e0f2fe;
+      top: 220px;
+      right: -80px;
+    }
+
+    .orb-3 {
+      width: 240px;
+      height: 240px;
+      background: #bfdbfe;
+      bottom: 120px;
+      left: 20%;
+    }
+
     .container {
-      max-width: 1200px;
+      max-width: var(--max);
       margin: 0 auto;
-      padding: 40px 20px 60px;
+      padding: 0 22px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.82);
+      border-bottom: 1px solid rgba(96, 165, 250, 0.12);
+    }
+
+    .nav-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #eff6ff, #dbeafe);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      display: grid;
+      place-items: center;
+      box-shadow: inset 0 0 12px rgba(96, 165, 250, 0.08);
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--blue-deep);
+    }
+
+    .brand-text {
+      min-width: 0;
+    }
+
+    .brand-title {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 2px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav-link {
+      padding: 10px 14px;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      transition: 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+      background: #f0f7ff;
+      border-color: rgba(96, 165, 250, 0.12);
+    }
+
+    .nav-link.active {
+      color: var(--blue-deep);
+      background: #eff6ff;
+      border-color: rgba(96, 165, 250, 0.18);
     }
 
     .hero {
-      text-align: center;
-      margin-bottom: 30px;
+      padding: 42px 0 28px;
+    }
+
+    .hero-panel {
+      background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,249,255,0.98));
+      border: 1px solid rgba(96, 165, 250, 0.16);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 28px;
+      padding: 34px;
+    }
+
+    .hero-left {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      align-self: flex-start;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #eff6ff;
+      border: 1px solid rgba(96, 165, 250, 0.16);
+      color: var(--blue-deep);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.2px;
     }
 
     .hero h1 {
-      font-size: 2.5rem;
-      margin-bottom: 10px;
+      margin: 0;
+      font-size: clamp(2.2rem, 5vw, 4rem);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      max-width: 760px;
+    }
+
+    .hero h1 .accent {
+      background: linear-gradient(90deg, #60a5fa, #38bdf8, #2563eb);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     .hero p {
-      color: #cbd5e1;
       margin: 0;
-      font-size: 1rem;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 1.03rem;
+      line-height: 1.7;
     }
 
-    .search-card {
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 18px;
-      padding: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-      margin-bottom: 30px;
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hero-badge {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #f8fbff;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      color: #1e3a5f;
+      font-size: 0.9rem;
+    }
+
+    .hero-right {
+      display: grid;
+      gap: 16px;
+      align-content: center;
+    }
+
+    .mini-panel {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      border-radius: 20px;
+      padding: 18px;
+    }
+
+    .mini-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted-2);
+      margin-bottom: 10px;
+    }
+
+    .mini-title {
+      font-size: 1.02rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .mini-copy {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .signal-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .signal-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(96, 165, 250, 0.1);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .signal-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .signal-value {
+      color: var(--text);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .search-wrap {
+      margin-top: 22px;
+    }
+
+    .search-panel {
+      background: var(--panel);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .search-topline {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .search-heading {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .search-help {
+      color: var(--muted);
+      font-size: 0.93rem;
     }
 
     .search-form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .search-input-wrap {
+      position: relative;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted-2);
+      font-size: 1rem;
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 18px 18px 18px 48px;
+      border-radius: 18px;
+      border: 1px solid rgba(96, 165, 250, 0.16);
+      background: #ffffff;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      transition: 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: rgba(96, 165, 250, 0.35);
+      box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.1);
+    }
+
+    .search-btn {
+      border: none;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #93c5fd, #60a5fa);
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 0.98rem;
+      padding: 0 22px;
+      cursor: pointer;
+      min-width: 140px;
+      transition: transform 0.15s ease, opacity 0.2s ease;
+    }
+
+    .search-btn:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+    }
+
+    .suggestions {
       display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .suggestion-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #f8fbff;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      color: #1e3a5f;
+      font-size: 0.9rem;
+      transition: 0.2s ease;
+    }
+
+    .suggestion-chip:hover {
+      background: #eff6ff;
+      border-color: rgba(96, 165, 250, 0.18);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .stat-label {
+      color: var(--muted-2);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-size: 1.65rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .stat-copy {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .content {
+      padding: 24px 0 46px;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .sidebar,
+    .main-panel {
+      background: var(--panel);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar {
+      padding: 20px;
+      position: sticky;
+      top: 92px;
+    }
+
+    .sidebar-section + .sidebar-section {
+      margin-top: 22px;
+      padding-top: 22px;
+      border-top: 1px solid rgba(96, 165, 250, 0.1);
+    }
+
+    .sidebar-title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-copy {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.65;
+    }
+
+    .facet-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .facet-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #f8fbff;
+      border: 1px solid rgba(96, 165, 250, 0.1);
+      color: #1e3a5f;
+      font-size: 0.92rem;
+    }
+
+    .facet-count {
+      background: #eff6ff;
+      color: var(--blue-deep);
+      border: 1px solid rgba(96, 165, 250, 0.16);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.82rem;
+      min-width: 34px;
+      text-align: center;
+    }
+
+    .tip-box {
+      padding: 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #eff6ff, #f0f9ff);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+    }
+
+    .tip-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .tip-copy {
+      color: var(--muted);
+      font-size: 0.91rem;
+      line-height: 1.6;
+    }
+
+    .main-panel {
+      padding: 22px;
+    }
+
+    .results-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .results-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+
+    .results-subtitle {
+      color: var(--muted);
+      font-size: 0.93rem;
+      margin-top: 4px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .toolbar-chip {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #f8fbff;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      color: #1e3a5f;
+      font-size: 0.9rem;
+    }
+
+    .sections {
+      display: grid;
+      gap: 18px;
+    }
+
+    .section-block {
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      border-radius: 22px;
+      overflow: hidden;
+    }
+
+    .section-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 18px 18px 16px;
+      border-bottom: 1px solid rgba(96, 165, 250, 0.1);
+      background: #f8fbff;
+    }
+
+    .section-head-left {
+      display: flex;
+      align-items: center;
       gap: 12px;
       flex-wrap: wrap;
     }
 
-    .search-form input {
-      flex: 1;
-      min-width: 260px;
-      padding: 14px 16px;
+    .section-icon {
+      width: 38px;
+      height: 38px;
       border-radius: 12px;
-      border: 1px solid #334155;
-      background: #0f172a;
-      color: white;
-      font-size: 1rem;
-      outline: none;
-    }
-
-    .search-form input:focus {
-      border-color: #38bdf8;
-      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
-    }
-
-    .search-form button {
-      padding: 14px 22px;
-      border: none;
-      border-radius: 12px;
-      background: #38bdf8;
-      color: #0f172a;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 1rem;
-    }
-
-    .search-form button:hover {
-      background: #0ea5e9;
-    }
-
-    .meta {
-      margin-top: 12px;
-      color: #94a3b8;
-      font-size: 0.95rem;
-    }
-
-    .error {
-      background: rgba(127, 29, 29, 0.9);
-      border: 1px solid #ef4444;
-      color: #fee2e2;
-      padding: 14px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-    }
-
-    .results-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 20px;
+      place-items: center;
+      font-size: 1rem;
+      font-weight: 800;
+      background: #eff6ff;
+      color: var(--blue-deep);
+      border: 1px solid rgba(96, 165, 250, 0.16);
     }
 
-    @media (max-width: 900px) {
-      .results-grid {
-        grid-template-columns: 1fr;
-      }
+    .section-name {
+      font-weight: 800;
+      font-size: 1.05rem;
     }
 
-    .section-card {
-      background: rgba(15, 23, 42, 0.92);
-      border: 1px solid rgba(148, 163, 184, 0.18);
+    .section-meta {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .section-count {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      color: #1e3a5f;
+      font-size: 0.88rem;
+    }
+
+    .result-list {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .result-card {
+      padding: 18px;
       border-radius: 18px;
-      padding: 20px;
-      box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+      background: linear-gradient(180deg, #ffffff, #f8fcff);
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      transition: 0.2s ease;
     }
 
-    .section-card h2 {
-      margin-top: 0;
-      margin-bottom: 16px;
-      font-size: 1.25rem;
-      color: #7dd3fc;
+    .result-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(96, 165, 250, 0.24);
+      box-shadow: 0 14px 30px rgba(96, 165, 250, 0.12);
     }
 
-    .result-item {
-      background: rgba(30, 41, 59, 0.85);
-      border: 1px solid rgba(148, 163, 184, 0.14);
-      border-radius: 14px;
-      padding: 14px;
+    .result-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
       margin-bottom: 12px;
     }
 
-    .result-item:last-child {
-      margin-bottom: 0;
+    .result-title-wrap {
+      min-width: 0;
+      flex: 1;
     }
 
-    .title {
-      font-weight: bold;
-      font-size: 1rem;
-      margin-bottom: 6px;
-      color: #f8fafc;
+    .result-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      line-height: 1.35;
     }
 
-    .sub {
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      background: #f8fbff;
+      color: #1e3a5f;
+    }
+
+    .badge-blue {
+      background: #eff6ff;
+      border-color: rgba(96, 165, 250, 0.16);
+      color: var(--blue-deep);
+    }
+
+    .badge-green {
+      background: #ecfdf5;
+      border-color: rgba(16, 185, 129, 0.16);
+      color: #047857;
+    }
+
+    .badge-amber {
+      background: #fffbeb;
+      border-color: rgba(245, 158, 11, 0.16);
+      color: #b45309;
+    }
+
+    .badge-indigo {
+      background: #eef4ff;
+      border-color: rgba(96, 165, 250, 0.16);
+      color: #1d4ed8;
+    }
+
+    .result-desc {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 0.94rem;
+      margin-bottom: 14px;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .meta-box {
+      padding: 12px;
+      border-radius: 14px;
+      background: #f8fbff;
+      border: 1px solid rgba(96, 165, 250, 0.1);
+    }
+
+    .meta-label {
+      color: var(--muted-2);
+      font-size: 0.77rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 7px;
+    }
+
+    .meta-value {
+      color: var(--text);
       font-size: 0.92rem;
-      color: #cbd5e1;
-      margin-bottom: 6px;
-    }
-
-    .desc {
-      font-size: 0.9rem;
-      color: #94a3b8;
-      line-height: 1.4;
+      font-weight: 600;
+      line-height: 1.45;
+      word-break: break-word;
     }
 
     .empty {
-      color: #94a3b8;
+      padding: 18px;
+      color: var(--muted);
       font-style: italic;
     }
 
-    .welcome {
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px dashed rgba(148, 163, 184, 0.25);
-      border-radius: 18px;
-      padding: 24px;
-      color: #cbd5e1;
+    .empty-card {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px dashed rgba(96, 165, 250, 0.18);
+      border-radius: 24px;
+      padding: 36px;
       text-align: center;
     }
 
-    .chips {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-top: 16px;
+    .empty-card h2 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 1.55rem;
     }
 
-    .chip {
-      padding: 8px 12px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 999px;
-      color: #e2e8f0;
+    .empty-card p {
+      margin: 0 auto;
+      max-width: 700px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .empty-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .empty-feature {
+      background: #f8fbff;
+      border: 1px solid rgba(96, 165, 250, 0.1);
+      border-radius: 18px;
+      padding: 18px;
+      text-align: left;
+    }
+
+    .empty-feature h3 {
+      margin: 0 0 8px 0;
+      font-size: 1rem;
+    }
+
+    .empty-feature p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.65;
+    }
+
+    .error {
+      background: #fef2f2;
+      border: 1px solid rgba(239, 68, 68, 0.22);
+      color: #991b1b;
+      border-radius: 18px;
+      padding: 16px 18px;
+      margin-bottom: 18px;
+      line-height: 1.6;
+    }
+
+    .footer {
+      padding: 28px 0 42px;
+      color: var(--muted-2);
       font-size: 0.9rem;
+    }
+
+    .footer-panel {
+      border-top: 1px solid rgba(96, 165, 250, 0.1);
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 1180px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .result-grid,
+      .empty-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .search-form {
+        grid-template-columns: 1fr;
+      }
+
+      .search-btn {
+        min-height: 56px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .nav-inner,
+      .container {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .hero-grid,
+      .search-panel,
+      .main-panel,
+      .sidebar {
+        padding: 18px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .hero h1 {
+        font-size: 2rem;
+      }
+
+      .brand-subtitle {
+        display: none;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="hero">
-      <h1>Molecular Search Tool</h1>
-      <p>Search diseases, proteins, binders, and clinical trials from your PostgreSQL database.</p>
-    </div>
+  <div class="page-shell">
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
 
-    <div class="search-card">
-      <form class="search-form" method="GET" action="/">
-        <input
-          type="text"
-          name="q"
-          placeholder="Search EGFR, HER2, Lung Cancer, Osimertinib, NCT..."
-          value="{{ query }}"
-        />
-        <button type="submit">Search</button>
-      </form>
-      <div class="meta">
-        Try searches like: EGFR, HER2, KRAS, Breast Cancer, Lung Cancer, Osimertinib
-      </div>
-    </div>
-
-    {% if error %}
-      <div class="error">
-        <strong>Database Error:</strong> {{ error }}
-      </div>
-    {% endif %}
-
-    {% if results %}
-      <div class="results-grid">
-        <div class="section-card">
-          <h2>Diseases</h2>
-          {% if results.diseases %}
-            {% for item in results.diseases %}
-              <div class="result-item">
-                <div class="title">{{ item.disease_name }}</div>
-                <div class="sub">{{ item.disease_category or 'No category' }}</div>
-                <div class="desc">{{ item.description or 'No description available.' }}</div>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="empty">No disease matches found.</div>
-          {% endif %}
+    <nav class="navbar">
+      <div class="nav-inner">
+        <div class="brand">
+          <div class="brand-mark">MS</div>
+          <div class="brand-text">
+            <div class="brand-title">Molecular Search Tool</div>
+            <div class="brand-subtitle">AI-assisted molecular intelligence platform</div>
+          </div>
         </div>
 
-        <div class="section-card">
-          <h2>Proteins</h2>
-          {% if results.proteins %}
-            {% for item in results.proteins %}
-              <div class="result-item">
-                <div class="title">{{ item.protein_name }}</div>
-                <div class="sub">
-                  Gene: {{ item.gene_symbol or 'N/A' }} |
-                  UniProt: {{ item.uniprot_accession or 'N/A' }}
+        <div class="nav-links">
+          <a class="nav-link active" href="/">Search</a>
+          <a class="nav-link" href="#">Targets</a>
+          <a class="nav-link" href="#">Therapeutics</a>
+          <a class="nav-link" href="#">Trials</a>
+          <a class="nav-link" href="#">Structures</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="container">
+        <div class="hero-panel">
+          <div class="hero-grid">
+            <div class="hero-left">
+              <div class="eyebrow">Molecular Intelligence • Oncology Search</div>
+              <h1>
+                Search across <span class="accent">targets, therapeutics, trials, and disease biology</span> in one place
+              </h1>
+              <p>
+                Explore a connected molecular dataset built for translational research. Query genes, proteins,
+                diseases, therapeutic binders, and clinical studies through a single modern interface backed by
+                your AWS PostgreSQL database.
+              </p>
+
+              <div class="hero-badges">
+                <div class="hero-badge">Protein targets</div>
+                <div class="hero-badge">Therapeutic binders</div>
+                <div class="hero-badge">Clinical studies</div>
+                <div class="hero-badge">Disease-linked search</div>
+              </div>
+            </div>
+
+            <div class="hero-right">
+              <div class="mini-panel">
+                <div class="mini-label">Platform Overview</div>
+                <div class="mini-title">Cross-entity molecular retrieval</div>
+                <div class="mini-copy">
+                  Designed to unify disease signals, target biology, therapeutic relationships, and study metadata
+                  into a research-friendly search workflow.
                 </div>
-                <div class="desc">{{ item.functional_description or 'No description available.' }}</div>
+                <div class="signal-list">
+                  <div class="signal-item">
+                    <span>Primary focus</span>
+                    <span class="signal-value">Oncology MVP</span>
+                  </div>
+                  <div class="signal-item">
+                    <span>Database</span>
+                    <span class="signal-value">AWS PostgreSQL</span>
+                  </div>
+                  <div class="signal-item">
+                    <span>Search surface</span>
+                    <span class="signal-value">Disease • Protein • Binder • Trial</span>
+                  </div>
+                </div>
               </div>
-            {% endfor %}
-          {% else %}
-            <div class="empty">No protein matches found.</div>
-          {% endif %}
+
+              <div class="mini-panel">
+                <div class="mini-label">Example Queries</div>
+                <div class="mini-copy">
+                  Try terms like <strong>EGFR</strong>, <strong>HER2</strong>, <strong>KRAS</strong>,
+                  <strong>Lung Cancer</strong>, <strong>Breast Cancer</strong>, or
+                  <strong>Osimertinib</strong> to explore connected records.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="section-card">
-          <h2>Binders / Therapeutics</h2>
-          {% if results.binders %}
-            {% for item in results.binders %}
-              <div class="result-item">
-                <div class="title">{{ item.binder_name }}</div>
-                <div class="sub">
-                  Modality: {{ item.modality_name or 'N/A' }}
-                  {% if item.approval_status %}
-                    | Status: {{ item.approval_status }}
+        <div class="search-wrap">
+          <div class="search-panel">
+            <div class="search-topline">
+              <div>
+                <div class="search-heading">Unified Search Workspace</div>
+                <div class="search-help">
+                  Search disease terms, genes, UniProt-style targets, therapeutics, or clinical trial identifiers.
+                </div>
+              </div>
+            </div>
+
+            <form class="search-form" method="GET" action="/">
+              <div class="search-input-wrap">
+                <div class="search-icon">⌕</div>
+                <input
+                  class="search-input"
+                  type="text"
+                  name="q"
+                  placeholder="Search EGFR, HER2, Lung Cancer, Osimertinib, NCT..."
+                  value="{{ query }}"
+                />
+              </div>
+              <button class="search-btn" type="submit">Run Search</button>
+            </form>
+
+            <div class="suggestions">
+              <a class="suggestion-chip" href="/?q=EGFR">EGFR</a>
+              <a class="suggestion-chip" href="/?q=HER2">HER2</a>
+              <a class="suggestion-chip" href="/?q=KRAS">KRAS</a>
+              <a class="suggestion-chip" href="/?q=Lung+Cancer">Lung Cancer</a>
+              <a class="suggestion-chip" href="/?q=Breast+Cancer">Breast Cancer</a>
+              <a class="suggestion-chip" href="/?q=Osimertinib">Osimertinib</a>
+            </div>
+
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-label">Search Surface</div>
+                <div class="stat-value">4</div>
+                <div class="stat-copy">Diseases, proteins, binders, and clinical trials are searchable in one interface.</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Architecture</div>
+                <div class="stat-value">AWS</div>
+                <div class="stat-copy">Flask frontend and backend connected to a hosted PostgreSQL database.</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Workflow</div>
+                <div class="stat-value">Unified</div>
+                <div class="stat-copy">Move from target discovery to therapeutic and clinical context without switching tools.</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Roadmap</div>
+                <div class="stat-value">RAG</div>
+                <div class="stat-copy">Designed to support future AI summaries, ranking, filters, and rich detail pages.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content">
+      <div class="container">
+        {% if error %}
+          <div class="error">
+            <strong>Database Error:</strong> {{ error }}
+          </div>
+        {% endif %}
+
+        {% set disease_count = results.diseases|length if results and results.diseases else 0 %}
+        {% set protein_count = results.proteins|length if results and results.proteins else 0 %}
+        {% set binder_count = results.binders|length if results and results.binders else 0 %}
+        {% set trial_count = results.trials|length if results and results.trials else 0 %}
+        {% set total_count = disease_count + protein_count + binder_count + trial_count %}
+
+        <div class="content-grid">
+          <aside class="sidebar">
+            <div class="sidebar-section">
+              <div class="sidebar-title">Search Context</div>
+              <div class="sidebar-copy">
+                {% if query %}
+                  Displaying result groups for <strong>{{ query }}</strong>. This panel can later evolve into
+                  dynamic filters, sorting, export tools, and evidence navigation.
+                {% else %}
+                  Start with a disease, protein target, therapeutic, or trial keyword to explore your molecular dataset.
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="sidebar-section">
+              <div class="sidebar-title">Result Breakdown</div>
+              <div class="facet-list">
+                <div class="facet-item">
+                  <span>Diseases</span>
+                  <span class="facet-count">{{ disease_count }}</span>
+                </div>
+                <div class="facet-item">
+                  <span>Proteins</span>
+                  <span class="facet-count">{{ protein_count }}</span>
+                </div>
+                <div class="facet-item">
+                  <span>Binders</span>
+                  <span class="facet-count">{{ binder_count }}</span>
+                </div>
+                <div class="facet-item">
+                  <span>Clinical Trials</span>
+                  <span class="facet-count">{{ trial_count }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="sidebar-section">
+              <div class="tip-box">
+                <div class="tip-title">Suggested Product Upgrades</div>
+                <div class="tip-copy">
+                  Next UI steps could include entity filters, clickable detail pages, evidence chips, structure links,
+                  and AI-generated relationship summaries for each result group.
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <main class="main-panel">
+            {% if results %}
+              <div class="results-header">
+                <div>
+                  <div class="results-title">Search Results</div>
+                  <div class="results-subtitle">
+                    {% if query %}
+                      {{ total_count }} result{% if total_count != 1 %}s{% endif %} returned for <strong>{{ query }}</strong>
+                    {% else %}
+                      Browse the available molecular result categories below.
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="toolbar">
+                  <div class="toolbar-chip">Unified search</div>
+                  <div class="toolbar-chip">Entity-linked data</div>
+                  <div class="toolbar-chip">Biotech UI prototype</div>
+                </div>
+              </div>
+
+              <div class="sections">
+                <section class="section-block">
+                  <div class="section-head">
+                    <div class="section-head-left">
+                      <div class="section-icon">D</div>
+                      <div>
+                        <div class="section-name">Diseases</div>
+                        <div class="section-meta">Cancer and disease records associated with the current search context</div>
+                      </div>
+                    </div>
+                    <div class="section-count">{{ disease_count }} found</div>
+                  </div>
+
+                  {% if results.diseases %}
+                    <div class="result-list">
+                      {% for item in results.diseases %}
+                        <div class="result-card">
+                          <div class="result-top">
+                            <div class="result-title-wrap">
+                              <div class="result-title">{{ item.disease_name }}</div>
+                              <div class="badges">
+                                <div class="badge badge-blue">Disease</div>
+                                <div class="badge">{{ item.disease_category or 'Uncategorized' }}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="result-desc">
+                            {{ item.description or 'No disease description available in the current dataset.' }}
+                          </div>
+
+                          <div class="result-grid">
+                            <div class="meta-box">
+                              <div class="meta-label">Entity Type</div>
+                              <div class="meta-value">Disease Record</div>
+                            </div>
+                            <div class="meta-box">
+                              <div class="meta-label">Category</div>
+                              <div class="meta-value">{{ item.disease_category or 'Not specified' }}</div>
+                            </div>
+                            <div class="meta-box">
+                              <div class="meta-label">Search Status</div>
+                              <div class="meta-value">Matched current query</div>
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="empty">No disease matches found for this query.</div>
                   {% endif %}
-                </div>
-                <div class="desc">{{ item.mechanism_of_action or 'No mechanism listed.' }}</div>
+                </section>
+
+                <section class="section-block">
+                  <div class="section-head">
+                    <div class="section-head-left">
+                      <div class="section-icon">P</div>
+                      <div>
+                        <div class="section-name">Proteins / Targets</div>
+                        <div class="section-meta">Target records, gene-linked proteins, and associated accession metadata</div>
+                      </div>
+                    </div>
+                    <div class="section-count">{{ protein_count }} found</div>
+                  </div>
+
+                  {% if results.proteins %}
+                    <div class="result-list">
+                      {% for item in results.proteins %}
+                        <div class="result-card">
+                          <div class="result-top">
+                            <div class="result-title-wrap">
+                              <div class="result-title">{{ item.protein_name }}</div>
+                              <div class="badges">
+                                <div class="badge badge-blue">Protein Target</div>
+                                {% if item.gene_symbol %}
+                                  <div class="badge badge-indigo">Gene {{ item.gene_symbol }}</div>
+                                {% endif %}
+                                {% if item.uniprot_accession %}
+                                  <div class="badge">UniProt {{ item.uniprot_accession }}</div>
+                                {% endif %}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="result-desc">
+                            {{ item.functional_description or 'No functional description available in the current dataset.' }}
+                          </div>
+
+                          <div class="result-grid">
+                            <div class="meta-box">
+                              <div class="meta-label">Gene Symbol</div>
+                              <div class="meta-value">{{ item.gene_symbol or 'N/A' }}</div>
+                            </div>
+                            <div class="meta-box">
+                              <div class="meta-label">Gene Name</div>
+                              <div class="meta-value">{{ item.gene_name or 'N/A' }}</div>
+                            </div>
+                            <div class="meta-box">
+                              <div class="meta-label">UniProt Accession</div>
+                              <div class="meta-value">{{ item.uniprot_accession or 'N/A' }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="empty">No protein target matches found for this query.</div>
+                  {% endif %}
+                </section>
+
+                <section class="section-block">
+                  <div class="section-head">
+                    <div class="section-head-left">
+                      <div class="section-icon">T</div>
+                      <div>
+                        <div class="section-name">Therapeutics / Binders</div>
+                        <div class="section-meta">Small molecules, antibodies, or other modalities associated with targets</div>
+                      </div>
+                    </div>
+                    <div class="section-count">{{ binder_count }} found</div>
+                  </div>
+
+                  {% if results.binders %}
+                    <div class="result-list">
+                      {% for item in results.binders %}
+                        <div class="result-card">
+                          <div class="result-top">
+                            <div class="result-title-wrap">
+                              <div class="result-title">{{ item.binder_name }}</div>
+                              <div class="badges">
+                                <div class="badge badge-green">Therapeutic</div>
+                                <div class="badge">{{ item.modality_name or 'Unknown modality' }}</div>
+                                {% if item.approval_status %}
+                                  <div class="badge badge-amber">{{ item.approval_status }}</div>
+                                {% endif %}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="result-desc">
+                            {{ item.mechanism_of_action or 'No mechanism of action currently stored.' }}
+                          </div>
+
+                          <div class="result-grid">
+                            <div class="meta-box">
+                              <div class="meta-label">Modality</div>
+                              <div class="meta-value">{{ item.modality_name or 'N/A' }}</div>
+                            </div>
+                            <div class="meta-box">
+                              <div class="meta-label">Approval Status</div>
+                              <div class="meta-value">{{ item.approval_status or 'Not listed' }}</div>
+                            </div>
+                            <div class="meta-box">
+                              <div class="meta-label">Role</div>
+                              <div class="meta-value">Linked therapeutic binder</div>
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="empty">No therapeutic or binder matches found for this query.</div>
+                  {% endif %}
+                </section>
+
+                <section class="section-block">
+                  <div class="section-head">
+                    <div class="section-head-left">
+                      <div class="section-icon">C</div>
+                      <div>
+                        <div class="section-name">Clinical Trials</div>
+                        <div class="section-meta">Clinical study records connected to the current disease or therapeutic context</div>
+                      </div>
+                    </div>
+                    <div class="section-count">{{ trial_count }} found</div>
+                  </div>
+
+                  {% if results.trials %}
+                    <div class="result-list">
+                      {% for item in results.trials %}
+                        <div class="result-card">
+                          <div class="result-top">
+                            <div class="result-title-wrap">
+                              <div class="result-title">{{ item.trial_title }}</div>
+                              <div class="badges">
+                                <div class="badge badge-blue">Clinical Trial</div>
+                                {% if item.nct_id %}
+                                  <div class="badge">{{ item.nct_id }}</div>
+                                {% endif %}
+                                {% if item.phase %}
+                                  <div class="badge badge-amber">{{ item.phase }}</div>
+                                {% endif %}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="result-desc">
+                            {{ item.condition_name or 'No condition metadata available.' }}
+                          </div>
+
+                          <div class="result-grid">
+                            <div class="meta-box">
+                              <div class="meta-label">NCT ID</div>
+                              <div class="meta-value">{{ item.nct_id or 'N/A' }}</div>
+                            </div>
+                            <div class="meta-box">
+                              <div class="meta-label">Phase</div>
+                              <div class="meta-value">{{ item.phase or 'N/A' }}</div>
+                            </div>
+                            <div class="meta-box">
+                              <div class="meta-label">Recruitment</div>
+                              <div class="meta-value">{{ item.recruitment_status or 'N/A' }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="empty">No clinical trial matches found for this query.</div>
+                  {% endif %}
+                </section>
               </div>
-            {% endfor %}
-          {% else %}
-            <div class="empty">No binder matches found.</div>
-          {% endif %}
+            {% else %}
+              <div class="empty-card">
+                <h2>Start exploring your molecular data platform</h2>
+                <p>
+                  This upgraded interface is designed to feel like a real biotech product rather than a basic form.
+                  Search across disease records, target proteins, therapeutic binders, and trial metadata using the
+                  unified search bar above.
+                </p>
+
+                <div class="empty-grid">
+                  <div class="empty-feature">
+                    <h3>Target-Centric Search</h3>
+                    <p>Look up proteins and gene-linked targets such as EGFR, HER2, KRAS, or ALK.</p>
+                  </div>
+                  <div class="empty-feature">
+                    <h3>Therapeutic Context</h3>
+                    <p>Retrieve linked binders and therapies like Osimertinib and Trastuzumab.</p>
+                  </div>
+                  <div class="empty-feature">
+                    <h3>Clinical Intelligence</h3>
+                    <p>Surface related study records and trial metadata from your connected oncology dataset.</p>
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+          </main>
         </div>
 
-        <div class="section-card">
-          <h2>Clinical Trials</h2>
-          {% if results.trials %}
-            {% for item in results.trials %}
-              <div class="result-item">
-                <div class="title">{{ item.trial_title }}</div>
-                <div class="sub">
-                  {{ item.nct_id or 'No NCT ID' }} |
-                  {{ item.phase or 'No phase' }} |
-                  {{ item.recruitment_status or 'No status' }}
-                </div>
-                <div class="desc">{{ item.condition_name or 'No condition listed.' }}</div>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="empty">No clinical trial matches found.</div>
-          {% endif %}
-        </div>
+        <footer class="footer">
+          <div class="footer-panel">
+            <div>Molecular Search Tool • Flask + AWS PostgreSQL prototype</div>
+            <div>Designed for future entity pages, filters, and AI-powered summaries</div>
+          </div>
+        </footer>
       </div>
-    {% else %}
-      <div class="welcome">
-        <h2>Start searching your molecular database</h2>
-        <p>This is the first working MVP of your client application.</p>
-        <div class="chips">
-          <div class="chip">Disease search</div>
-          <div class="chip">Protein search</div>
-          <div class="chip">Binder search</div>
-          <div class="chip">Trial search</div>
-        </div>
-      </div>
-    {% endif %}
+    </section>
   </div>
 </body>
 </html>
