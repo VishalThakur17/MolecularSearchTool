@@ -3,19 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ binder.binder_name }} - Molecular Search Tool</title>
+  <title>{{ disease.disease_name }} - Molecular Search Tool</title>
   <style>
     :root {
-      --bg: #f7fbff;
-      --panel: rgba(255, 255, 255, 0.96);
       --text: #0f172a;
       --muted: #516277;
       --muted-2: #6f85a0;
       --blue-deep: #2563eb;
       --line: rgba(96, 165, 250, 0.14);
       --shadow: 0 16px 44px rgba(96, 165, 250, 0.14);
-      --green: #10b981;
-      --amber: #f59e0b;
       --max: 1380px;
     }
 
@@ -47,7 +43,7 @@
     .back-link:hover { text-decoration: underline; }
 
     .hero, .panel {
-      background: var(--panel);
+      background: rgba(255, 255, 255, 0.96);
       border: 1px solid rgba(96, 165, 250, 0.14);
       border-radius: 24px;
       box-shadow: var(--shadow);
@@ -98,18 +94,6 @@
       padding: 9px 13px;
       border-radius: 999px;
       font-size: 0.9rem;
-    }
-
-    .chip.green {
-      background: #ecfdf5;
-      border-color: rgba(16, 185, 129, 0.16);
-      color: #047857;
-    }
-
-    .chip.amber {
-      background: #fffbeb;
-      border-color: rgba(245, 158, 11, 0.16);
-      color: #b45309;
     }
 
     .layout {
@@ -200,24 +184,6 @@
       color: var(--blue-deep);
     }
 
-    .badge.green {
-      background: #ecfdf5;
-      border-color: rgba(16, 185, 129, 0.16);
-      color: #047857;
-    }
-
-    .badge.amber {
-      background: #fffbeb;
-      border-color: rgba(245, 158, 11, 0.16);
-      color: #b45309;
-    }
-
-    .item-copy {
-      color: var(--muted);
-      line-height: 1.7;
-      font-size: 0.93rem;
-    }
-
     .empty {
       color: var(--muted);
       font-style: italic;
@@ -240,16 +206,21 @@
     <a class="back-link" href="/">← Back to search</a>
 
     <section class="hero">
-      <div class="eyebrow">Therapeutic Detail</div>
-      <h1 class="title">{{ binder.binder_name }}</h1>
+      <div class="eyebrow">Disease Detail</div>
+      <h1 class="title">{{ disease.disease_name }}</h1>
       <div class="sub">
-        {{ binder.mechanism_of_action or binder.binder_description or 'No therapeutic summary is currently available in the dataset.' }}
+        {{ disease.description or 'No disease description is currently available in the dataset.' }}
       </div>
       <div class="chips">
-        <div class="chip green">Modality: {{ binder.modality_name or 'N/A' }}</div>
-        <div class="chip amber">Status: {{ binder.approval_status or 'Not listed' }}</div>
-        {% if binder.developer_company %}
-          <div class="chip">Developer: {{ binder.developer_company }}</div>
+        <div class="chip">{{ disease.disease_category or 'No category' }}</div>
+        {% if disease.mesh_id %}
+          <div class="chip">MESH: {{ disease.mesh_id }}</div>
+        {% endif %}
+        {% if disease.doid %}
+          <div class="chip">DOID: {{ disease.doid }}</div>
+        {% endif %}
+        {% if disease.ncit_code %}
+          <div class="chip">NCIT: {{ disease.ncit_code }}</div>
         {% endif %}
       </div>
     </section>
@@ -258,30 +229,30 @@
       <aside>
         <div class="panel">
           <div class="panel-header">
-            <h2 class="panel-title">Therapeutic Metadata</h2>
-            <div class="panel-subtitle">Core binder information and development context.</div>
+            <h2 class="panel-title">Disease Metadata</h2>
+            <div class="panel-subtitle">Identifiers and descriptive fields for this disease record.</div>
           </div>
           <div class="panel-body">
             <div class="meta-list">
               <div class="meta-item">
-                <div class="meta-label">Binder Name</div>
-                <div class="meta-value">{{ binder.binder_name }}</div>
+                <div class="meta-label">Disease Name</div>
+                <div class="meta-value">{{ disease.disease_name }}</div>
               </div>
               <div class="meta-item">
-                <div class="meta-label">Modality</div>
-                <div class="meta-value">{{ binder.modality_name or 'N/A' }}</div>
+                <div class="meta-label">Category</div>
+                <div class="meta-value">{{ disease.disease_category or 'N/A' }}</div>
               </div>
               <div class="meta-item">
-                <div class="meta-label">Approval Status</div>
-                <div class="meta-value">{{ binder.approval_status or 'N/A' }}</div>
+                <div class="meta-label">MESH ID</div>
+                <div class="meta-value">{{ disease.mesh_id or 'N/A' }}</div>
               </div>
               <div class="meta-item">
-                <div class="meta-label">Developer Company</div>
-                <div class="meta-value">{{ binder.developer_company or 'N/A' }}</div>
+                <div class="meta-label">DOID</div>
+                <div class="meta-value">{{ disease.doid or 'N/A' }}</div>
               </div>
               <div class="meta-item">
-                <div class="meta-label">Description</div>
-                <div class="meta-value">{{ binder.binder_description or 'No description available.' }}</div>
+                <div class="meta-label">NCIT Code</div>
+                <div class="meta-value">{{ disease.ncit_code or 'N/A' }}</div>
               </div>
             </div>
           </div>
@@ -291,8 +262,8 @@
       <main class="main">
         <div class="panel">
           <div class="panel-header">
-            <h2 class="panel-title">Linked Protein Targets</h2>
-            <div class="panel-subtitle">Protein targets currently associated with this therapeutic.</div>
+            <h2 class="panel-title">Associated Protein Targets</h2>
+            <div class="panel-subtitle">Protein targets currently linked to this disease in your dataset.</div>
           </div>
           <div class="panel-body">
             {% if proteins %}
@@ -306,23 +277,20 @@
                       {% if item.gene_symbol %}
                         <div class="badge">{{ item.gene_symbol }}</div>
                       {% endif %}
-                      {% if item.interaction_type %}
-                        <div class="badge">{{ item.interaction_type }}</div>
-                      {% endif %}
                     </div>
                   </div>
                 {% endfor %}
               </div>
             {% else %}
-              <div class="empty">No linked protein targets found.</div>
+              <div class="empty">No linked proteins found.</div>
             {% endif %}
           </div>
         </div>
 
         <div class="panel">
           <div class="panel-header">
-            <h2 class="panel-title">Linked Clinical Trials</h2>
-            <div class="panel-subtitle">Clinical study records that include this therapeutic.</div>
+            <h2 class="panel-title">Associated Clinical Trials</h2>
+            <div class="panel-subtitle">Clinical studies currently connected to this disease record.</div>
           </div>
           <div class="panel-body">
             {% if trials %}
@@ -334,7 +302,7 @@
                     </div>
                     <div class="item-badges">
                       <div class="badge">{{ item.nct_id or 'No NCT ID' }}</div>
-                      <div class="badge amber">{{ item.phase or 'No phase' }}</div>
+                      <div class="badge">{{ item.phase or 'No phase' }}</div>
                       <div class="badge">{{ item.recruitment_status or 'No status' }}</div>
                     </div>
                   </div>
@@ -342,41 +310,6 @@
               </div>
             {% else %}
               <div class="empty">No linked clinical trials found.</div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Related Structures</h2>
-            <div class="panel-subtitle">Structural records linked to this therapeutic.</div>
-          </div>
-          <div class="panel-body">
-            {% if structures %}
-              <div class="item-list">
-                {% for item in structures %}
-                  <div class="item-card">
-                    <div class="item-title">
-                      {% if item.pdb_id %}
-                        <a href="https://www.rcsb.org/structure/{{ item.pdb_id }}" target="_blank">{{ item.pdb_id }}</a>
-                      {% else %}
-                        {{ item.structure_title or 'Structure record' }}
-                      {% endif %}
-                    </div>
-                    <div class="item-badges">
-                      {% if item.experimental_method %}
-                        <div class="badge">{{ item.experimental_method }}</div>
-                      {% endif %}
-                      {% if item.resolution %}
-                        <div class="badge">{{ item.resolution }}</div>
-                      {% endif %}
-                    </div>
-                    <div class="item-copy">{{ item.structure_title or 'No structure title available.' }}</div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="empty">No linked structures found.</div>
             {% endif %}
           </div>
         </div>

@@ -565,6 +565,28 @@
       padding: 22px;
     }
 
+    .summary-card {
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+      margin-bottom: 22px;
+    }
+
+    .summary-header {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--blue-deep);
+      margin-bottom: 10px;
+    }
+
+    .summary-text {
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 0.96rem;
+    }
+
     .results-header {
       display: flex;
       flex-wrap: wrap;
@@ -1069,8 +1091,8 @@
               </div>
               <div class="stat-card">
                 <div class="stat-label">Roadmap</div>
-                <div class="stat-value">RAG</div>
-                <div class="stat-copy">Designed to support future AI summaries, ranking, filters, and rich detail pages.</div>
+                <div class="stat-value">Summary</div>
+                <div class="stat-copy">Free retrieval-based summaries are generated directly from your stored records.</div>
               </div>
             </div>
           </div>
@@ -1083,6 +1105,13 @@
         {% if error %}
           <div class="error">
             <strong>Database Error:</strong> {{ error }}
+          </div>
+        {% endif %}
+
+        {% if summary %}
+          <div class="summary-card">
+            <div class="summary-header">Platform Summary</div>
+            <div class="summary-text">{{ summary }}</div>
           </div>
         {% endif %}
 
@@ -1130,10 +1159,10 @@
 
             <div class="sidebar-section">
               <div class="tip-box">
-                <div class="tip-title">Suggested Product Upgrades</div>
+                <div class="tip-title">Free Alpha Summary Mode</div>
                 <div class="tip-copy">
-                  Next UI steps could include entity filters, clickable detail pages, evidence chips, structure links,
-                  and AI-generated relationship summaries for each result group.
+                  The summary shown above is generated directly from retrieved database records using Python logic,
+                  so it stays grounded in your dataset and requires no paid API usage.
                 </div>
               </div>
             </div>
@@ -1156,7 +1185,7 @@
                 <div class="toolbar">
                   <div class="toolbar-chip">Unified search</div>
                   <div class="toolbar-chip">Entity-linked data</div>
-                  <div class="toolbar-chip">Biotech UI prototype</div>
+                  <div class="toolbar-chip">Free summary mode</div>
                 </div>
               </div>
 
@@ -1421,7 +1450,7 @@
         <footer class="footer">
           <div class="footer-panel">
             <div>Molecular Search Tool • Flask + AWS PostgreSQL prototype</div>
-            <div>Designed for future entity pages, filters, and AI-powered summaries</div>
+            <div>Designed for future filters, richer ranking, and expanded real-data ingestion</div>
           </div>
         </footer>
       </div>

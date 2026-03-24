@@ -117,19 +117,103 @@ def search_database(search_term: str):
     return results
 
 
+def build_free_summary(query: str, results: dict) -> str:
+    """
+    Free lightweight RAG-style summary generated from database results only.
+    No LLM required.
+    """
+    diseases = results.get("diseases", [])
+    proteins = results.get("proteins", [])
+    binders = results.get("binders", [])
+    trials = results.get("trials", [])
+
+    disease_count = len(diseases)
+    protein_count = len(proteins)
+    binder_count = len(binders)
+    trial_count = len(trials)
+
+    if disease_count == 0 and protein_count == 0 and binder_count == 0 and trial_count == 0:
+        return (
+            f'No matching records were found for "{query}" in the current dataset. '
+            "Try searching a different disease, protein target, therapeutic, or trial keyword."
+        )
+
+    parts = []
+
+    parts.append(
+        f'The search for "{query}" returned '
+        f'{disease_count} disease record{"s" if disease_count != 1 else ""}, '
+        f'{protein_count} protein target{"s" if protein_count != 1 else ""}, '
+        f'{binder_count} therapeutic binder{"s" if binder_count != 1 else ""}, and '
+        f'{trial_count} clinical trial{"s" if trial_count != 1 else ""}.'
+    )
+
+    if proteins:
+        top_proteins = ", ".join(
+            [
+                p.get("gene_symbol") or p.get("protein_name") or "Unknown protein"
+                for p in proteins[:3]
+            ]
+        )
+        parts.append(
+            f'The strongest protein-related matches include {top_proteins}.'
+        )
+
+    if diseases:
+        top_diseases = ", ".join(
+            [d.get("disease_name") or "Unknown disease" for d in diseases[:3]]
+        )
+        parts.append(
+            f'Related disease context in the current dataset includes {top_diseases}.'
+        )
+
+    if binders:
+        top_binders = ", ".join(
+            [b.get("binder_name") or "Unknown therapeutic" for b in binders[:3]]
+        )
+        parts.append(
+            f'Linked therapeutic or binder matches include {top_binders}.'
+        )
+
+    if trials:
+        top_trials = ", ".join(
+            [
+                t.get("nct_id") or t.get("trial_title") or "Unknown trial"
+                for t in trials[:2]
+            ]
+        )
+        parts.append(
+            f'Relevant clinical study records include {top_trials}.'
+        )
+
+    parts.append(
+        "This summary is generated directly from retrieved database results, so it reflects only the records currently stored in the platform."
+    )
+
+    return " ".join(parts)
+
+
 @app.route("/", methods=["GET"])
 def index():
     query = request.args.get("q", "").strip()
     results = None
     error = None
+    summary = None
 
     if query:
         try:
             results = search_database(query)
+            summary = build_free_summary(query, results)
         except Exception as e:
             error = str(e)
 
-    return render_template("index.html", query=query, results=results, error=error)
+    return render_template(
+        "index.html",
+        query=query,
+        results=results,
+        error=error,
+        summary=summary
+    )
 
 
 @app.route("/api/search", methods=["GET"])
@@ -141,7 +225,11 @@ def api_search():
 
     try:
         results = search_database(query)
-        return jsonify(results)
+        summary = build_free_summary(query, results)
+        return jsonify({
+            "summary": summary,
+            "results": results
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
