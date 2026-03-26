@@ -1,387 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ binder.binder_name }} - Molecular Search Tool</title>
-  <style>
-    :root {
-      --bg: #f7fbff;
-      --panel: rgba(255, 255, 255, 0.96);
-      --text: #0f172a;
-      --muted: #516277;
-      --muted-2: #6f85a0;
-      --blue-deep: #2563eb;
-      --line: rgba(96, 165, 250, 0.14);
-      --shadow: 0 16px 44px rgba(96, 165, 250, 0.14);
-      --green: #10b981;
-      --amber: #f59e0b;
-      --max: 1380px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ trial.trial_title }} - Molecular Search Tool</title>
 
-    * { box-sizing: border-box; }
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f7fbff;
+            margin: 0;
+            padding: 0;
+        }
 
-    body {
-      margin: 0;
-      font-family: Inter, Arial, Helvetica, sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(191, 219, 254, 0.45), transparent 28%),
-        radial-gradient(circle at top right, rgba(219, 234, 254, 0.5), transparent 28%),
-        linear-gradient(180deg, #fcfeff 0%, #f7fbff 52%, #eef7ff 100%);
-      color: var(--text);
-    }
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
 
-    a { color: inherit; text-decoration: none; }
+        .header {
+            background: white;
+            padding: 20px;
+            border-bottom: 2px solid #e0f0ff;
+            margin-bottom: 20px;
+        }
 
-    .container {
-      max-width: var(--max);
-      margin: 0 auto;
-      padding: 28px 22px 50px;
-    }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 5px;
+        }
 
-    .back-link {
-      color: var(--blue-deep);
-      font-weight: 700;
-    }
+        .section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0f0ff;
+        }
 
-    .back-link:hover { text-decoration: underline; }
+        .section h2 {
+            color: #1a73e8;
+            margin-bottom: 10px;
+        }
 
-    .hero, .panel {
-      background: var(--panel);
-      border: 1px solid rgba(96, 165, 250, 0.14);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-    }
+        a {
+            color: #1a73e8;
+            text-decoration: none;
+        }
 
-    .hero {
-      padding: 30px;
-      margin: 20px 0 22px;
-    }
+        a:hover {
+            text-decoration: underline;
+        }
 
-    .eyebrow {
-      display: inline-flex;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: #eff6ff;
-      border: 1px solid rgba(96, 165, 250, 0.16);
-      color: var(--blue-deep);
-      font-size: 0.82rem;
-      font-weight: 700;
-      margin-bottom: 14px;
-    }
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #e3f2fd;
+            color: #1a73e8;
+            border-radius: 5px;
+            margin-right: 5px;
+        }
 
-    .title {
-      font-size: clamp(2rem, 4vw, 3rem);
-      line-height: 1.05;
-      font-weight: 800;
-      margin: 0 0 10px 0;
-      letter-spacing: -0.03em;
-    }
-
-    .sub {
-      color: var(--muted);
-      line-height: 1.75;
-      margin-bottom: 16px;
-      max-width: 900px;
-    }
-
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .chip {
-      background: #f8fbff;
-      border: 1px solid rgba(96, 165, 250, 0.12);
-      color: #1e3a5f;
-      padding: 9px 13px;
-      border-radius: 999px;
-      font-size: 0.9rem;
-    }
-
-    .chip.green {
-      background: #ecfdf5;
-      border-color: rgba(16, 185, 129, 0.16);
-      color: #047857;
-    }
-
-    .chip.amber {
-      background: #fffbeb;
-      border-color: rgba(245, 158, 11, 0.16);
-      color: #b45309;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: 22px;
-      align-items: start;
-    }
-
-    .panel { overflow: hidden; }
-
-    .panel-header {
-      padding: 18px 20px;
-      border-bottom: 1px solid rgba(96, 165, 250, 0.1);
-      background: #f8fbff;
-    }
-
-    .panel-title {
-      margin: 0;
-      font-size: 1.05rem;
-      font-weight: 800;
-    }
-
-    .panel-subtitle {
-      color: var(--muted);
-      font-size: 0.9rem;
-      margin-top: 5px;
-      line-height: 1.6;
-    }
-
-    .panel-body { padding: 20px; }
-
-    .meta-list, .item-list {
-      display: grid;
-      gap: 14px;
-    }
-
-    .meta-item, .item-card {
-      padding: 16px;
-      border-radius: 16px;
-      background: #f8fbff;
-      border: 1px solid rgba(96, 165, 250, 0.1);
-    }
-
-    .meta-label {
-      color: var(--muted-2);
-      font-size: 0.76rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 6px;
-    }
-
-    .meta-value {
-      font-size: 0.95rem;
-      font-weight: 600;
-      line-height: 1.5;
-      word-break: break-word;
-    }
-
-    .item-title {
-      font-size: 1rem;
-      font-weight: 800;
-      margin-bottom: 8px;
-    }
-
-    .item-title a {
-      color: var(--blue-deep);
-    }
-
-    .item-title a:hover {
-      text-decoration: underline;
-    }
-
-    .item-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .badge {
-      display: inline-flex;
-      padding: 7px 10px;
-      border-radius: 999px;
-      font-size: 0.82rem;
-      background: #eff6ff;
-      border: 1px solid rgba(96, 165, 250, 0.16);
-      color: var(--blue-deep);
-    }
-
-    .badge.green {
-      background: #ecfdf5;
-      border-color: rgba(16, 185, 129, 0.16);
-      color: #047857;
-    }
-
-    .badge.amber {
-      background: #fffbeb;
-      border-color: rgba(245, 158, 11, 0.16);
-      color: #b45309;
-    }
-
-    .item-copy {
-      color: var(--muted);
-      line-height: 1.7;
-      font-size: 0.93rem;
-    }
-
-    .empty {
-      color: var(--muted);
-      font-style: italic;
-    }
-
-    .main {
-      display: grid;
-      gap: 22px;
-    }
-
-    @media (max-width: 1100px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+        .back {
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+    </style>
 </head>
+
 <body>
-  <div class="container">
-    <a class="back-link" href="/">← Back to search</a>
 
-    <section class="hero">
-      <div class="eyebrow">Therapeutic Detail</div>
-      <h1 class="title">{{ binder.binder_name }}</h1>
-      <div class="sub">
-        {{ binder.mechanism_of_action or binder.binder_description or 'No therapeutic summary is currently available in the dataset.' }}
-      </div>
-      <div class="chips">
-        <div class="chip green">Modality: {{ binder.modality_name or 'N/A' }}</div>
-        <div class="chip amber">Status: {{ binder.approval_status or 'Not listed' }}</div>
-        {% if binder.developer_company %}
-          <div class="chip">Developer: {{ binder.developer_company }}</div>
+<div class="container">
+
+    <a class="back" href="/">⬅ Back to Search</a>
+
+    <div class="header">
+        <h1>{{ trial.trial_title }}</h1>
+        <p><strong>NCT ID:</strong> {{ trial.nct_id }}</p>
+        <p><strong>Status:</strong> {{ trial.recruitment_status }}</p>
+        <p><strong>Phase:</strong> {{ trial.phase }}</p>
+        <p><strong>Study Type:</strong> {{ trial.study_type }}</p>
+    </div>
+
+    <div class="section">
+        <h2>Summary</h2>
+        <p>{{ trial.brief_summary }}</p>
+    </div>
+
+    <div class="section">
+        <h2>Condition</h2>
+        <p>{{ trial.condition_name }}</p>
+    </div>
+
+    <div class="section">
+        <h2>Dates</h2>
+        <p><strong>Start Date:</strong> {{ trial.start_date }}</p>
+        <p><strong>Completion Date:</strong> {{ trial.completion_date }}</p>
+    </div>
+
+    <div class="section">
+        <h2>External Link</h2>
+        <a href="{{ trial.trial_url }}" target="_blank">
+            View on ClinicalTrials.gov
+        </a>
+    </div>
+
+    <div class="section">
+        <h2>Related Proteins</h2>
+        {% if proteins %}
+            {% for protein in proteins %}
+                <span class="badge">
+                    <a href="/protein/{{ protein.protein_id }}">
+                        {{ protein.protein_name }}
+                    </a>
+                </span>
+            {% endfor %}
+        {% else %}
+            <p>No related proteins found.</p>
         {% endif %}
-      </div>
-    </section>
+    </div>
 
-    <section class="layout">
-      <aside>
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Therapeutic Metadata</h2>
-            <div class="panel-subtitle">Core binder information and development context.</div>
-          </div>
-          <div class="panel-body">
-            <div class="meta-list">
-              <div class="meta-item">
-                <div class="meta-label">Binder Name</div>
-                <div class="meta-value">{{ binder.binder_name }}</div>
-              </div>
-              <div class="meta-item">
-                <div class="meta-label">Modality</div>
-                <div class="meta-value">{{ binder.modality_name or 'N/A' }}</div>
-              </div>
-              <div class="meta-item">
-                <div class="meta-label">Approval Status</div>
-                <div class="meta-value">{{ binder.approval_status or 'N/A' }}</div>
-              </div>
-              <div class="meta-item">
-                <div class="meta-label">Developer Company</div>
-                <div class="meta-value">{{ binder.developer_company or 'N/A' }}</div>
-              </div>
-              <div class="meta-item">
-                <div class="meta-label">Description</div>
-                <div class="meta-value">{{ binder.binder_description or 'No description available.' }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
+    <div class="section">
+        <h2>Related Binders</h2>
+        {% if binders %}
+            {% for binder in binders %}
+                <span class="badge">
+                    <a href="/binder/{{ binder.binder_id }}">
+                        {{ binder.binder_name }}
+                    </a>
+                </span>
+            {% endfor %}
+        {% else %}
+            <p>No related binders found.</p>
+        {% endif %}
+    </div>
 
-      <main class="main">
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Linked Protein Targets</h2>
-            <div class="panel-subtitle">Protein targets currently associated with this therapeutic.</div>
-          </div>
-          <div class="panel-body">
-            {% if proteins %}
-              <div class="item-list">
-                {% for item in proteins %}
-                  <div class="item-card">
-                    <div class="item-title">
-                      <a href="{{ url_for('protein_detail', protein_id=item.protein_id) }}">{{ item.protein_name }}</a>
-                    </div>
-                    <div class="item-badges">
-                      {% if item.gene_symbol %}
-                        <div class="badge">{{ item.gene_symbol }}</div>
-                      {% endif %}
-                      {% if item.interaction_type %}
-                        <div class="badge">{{ item.interaction_type }}</div>
-                      {% endif %}
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="empty">No linked protein targets found.</div>
-            {% endif %}
-          </div>
-        </div>
+</div>
 
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Linked Clinical Trials</h2>
-            <div class="panel-subtitle">Clinical study records that include this therapeutic.</div>
-          </div>
-          <div class="panel-body">
-            {% if trials %}
-              <div class="item-list">
-                {% for item in trials %}
-                  <div class="item-card">
-                    <div class="item-title">
-                      <a href="{{ url_for('trial_detail', trial_id=item.trial_id) }}">{{ item.trial_title }}</a>
-                    </div>
-                    <div class="item-badges">
-                      <div class="badge">{{ item.nct_id or 'No NCT ID' }}</div>
-                      <div class="badge amber">{{ item.phase or 'No phase' }}</div>
-                      <div class="badge">{{ item.recruitment_status or 'No status' }}</div>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="empty">No linked clinical trials found.</div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Related Structures</h2>
-            <div class="panel-subtitle">Structural records linked to this therapeutic.</div>
-          </div>
-          <div class="panel-body">
-            {% if structures %}
-              <div class="item-list">
-                {% for item in structures %}
-                  <div class="item-card">
-                    <div class="item-title">
-                      {% if item.pdb_id %}
-                        <a href="https://www.rcsb.org/structure/{{ item.pdb_id }}" target="_blank">{{ item.pdb_id }}</a>
-                      {% else %}
-                        {{ item.structure_title or 'Structure record' }}
-                      {% endif %}
-                    </div>
-                    <div class="item-badges">
-                      {% if item.experimental_method %}
-                        <div class="badge">{{ item.experimental_method }}</div>
-                      {% endif %}
-                      {% if item.resolution %}
-                        <div class="badge">{{ item.resolution }}</div>
-                      {% endif %}
-                    </div>
-                    <div class="item-copy">{{ item.structure_title or 'No structure title available.' }}</div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="empty">No linked structures found.</div>
-            {% endif %}
-          </div>
-        </div>
-      </main>
-    </section>
-  </div>
 </body>
 </html>
