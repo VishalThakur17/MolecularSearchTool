@@ -118,10 +118,7 @@ def search_database(search_term: str):
 
 
 def build_free_summary(query: str, results: dict) -> str:
-    """
-    Free lightweight RAG-style summary generated from database results only.
-    No LLM required.
-    """
+    
     diseases = results.get("diseases", [])
     proteins = results.get("proteins", [])
     binders = results.get("binders", [])
