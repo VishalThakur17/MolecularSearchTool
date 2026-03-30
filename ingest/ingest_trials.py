@@ -164,6 +164,17 @@ def upsert_trials_for_target(gene_symbol: str, disease_name: str, max_trials: in
             disease_id = get_or_create_disease(cur, disease_name)
             protein_id = get_protein_id_by_gene(cur, gene_symbol)
 
+            if protein_id:
+                cur.execute(
+                    """
+                    INSERT INTO disease_proteins (disease_id, protein_id, source_id)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (disease_id, protein_id)
+                    DO UPDATE SET source_id = EXCLUDED.source_id;
+                    """,
+                    (disease_id, protein_id, source_id),
+                )
+
             inserted = 0
 
             for study in studies:

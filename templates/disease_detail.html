@@ -289,6 +289,37 @@
 
         <div class="panel">
           <div class="panel-header">
+            <h2 class="panel-title">Associated Therapeutic Binders</h2>
+            <div class="panel-subtitle">Therapeutics linked through proteins currently connected to this disease.</div>
+          </div>
+          <div class="panel-body">
+            {% if binders %}
+              <div class="item-list">
+                {% for item in binders %}
+                  <div class="item-card">
+                    <div class="item-title">
+                      <a href="{{ url_for('binder_detail', binder_id=item.binder_id) }}">{{ item.binder_name }}</a>
+                    </div>
+                    <div class="item-badges">
+                      {% if item.modality_name %}
+                        <div class="badge">{{ item.modality_name }}</div>
+                      {% endif %}
+                      <div class="badge">{{ item.approval_status or 'No approval status' }}</div>
+                    </div>
+                    {% if item.mechanism_of_action %}
+                      <div class="panel-subtitle">{{ item.mechanism_of_action }}</div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty">No linked therapeutic binders found.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
             <h2 class="panel-title">Associated Clinical Trials</h2>
             <div class="panel-subtitle">Clinical studies currently connected to this disease record.</div>
           </div>

@@ -49,13 +49,20 @@ def search_database(search_term: str):
                 LEFT JOIN disease_proteins dp ON d.disease_id = dp.disease_id
                 LEFT JOIN proteins p ON dp.protein_id = p.protein_id
                 LEFT JOIN genes g ON p.gene_id = g.gene_id
+                LEFT JOIN protein_binders pb ON p.protein_id = pb.protein_id
+                LEFT JOIN binders b ON pb.binder_id = b.binder_id
+                LEFT JOIN disease_trials dt ON d.disease_id = dt.disease_id
+                LEFT JOIN clinical_trials ct ON dt.trial_id = ct.trial_id
                 WHERE d.disease_name ILIKE %s
                    OR d.description ILIKE %s
                    OR p.protein_name ILIKE %s
                    OR g.gene_symbol ILIKE %s
+                   OR b.binder_name ILIKE %s
+                   OR ct.trial_title ILIKE %s
+                   OR ct.condition_name ILIKE %s
                 ORDER BY d.disease_name
                 LIMIT 20;
-            """, (like_term, like_term, like_term, like_term))
+            """, (like_term, like_term, like_term, like_term, like_term, like_term, like_term))
             results["diseases"] = cur.fetchall()
 
             cur.execute("""
@@ -118,7 +125,10 @@ def search_database(search_term: str):
 
 
 def build_free_summary(query: str, results: dict) -> str:
-    
+    """
+    Free lightweight RAG-style summary generated from database results only.
+    No LLM required.
+    """
     diseases = results.get("diseases", [])
     proteins = results.get("proteins", [])
     binders = results.get("binders", [])
@@ -504,11 +514,28 @@ def disease_detail(disease_id):
             """, (disease_id,))
             trials = cur.fetchall()
 
+            cur.execute("""
+                SELECT DISTINCT
+                    b.binder_id,
+                    b.binder_name,
+                    b.mechanism_of_action,
+                    b.approval_status,
+                    bm.modality_name
+                FROM disease_proteins dp
+                JOIN protein_binders pb ON dp.protein_id = pb.protein_id
+                JOIN binders b ON pb.binder_id = b.binder_id
+                LEFT JOIN binder_modalities bm ON b.modality_id = bm.modality_id
+                WHERE dp.disease_id = %s
+                ORDER BY b.binder_name;
+            """, (disease_id,))
+            binders = cur.fetchall()
+
     return render_template(
         "disease_detail.html",
         disease=disease,
         proteins=proteins,
-        trials=trials
+        trials=trials,
+        binders=binders
     )
 
 
