@@ -3,149 +3,559 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ binder.binder_name }} - Molecular Search Tool</title>
-
+    <title>{{ binder.binder_name }} | Molecular Search Tool</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f7fbff;
             margin: 0;
-            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f5f7fb;
+            color: #1f2937;
         }
 
-        .container {
-            width: 80%;
-            margin: auto;
-            padding: 20px;
+        .navbar {
+            background: #0f172a;
+            color: white;
+            padding: 16px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .header {
-            background: white;
-            padding: 20px;
-            border-bottom: 2px solid #e0f0ff;
-            margin-bottom: 20px;
-        }
-
-        h1 {
-            color: #1a73e8;
-            margin-bottom: 5px;
-        }
-
-        .section {
-            background: white;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            border: 1px solid #e0f0ff;
-        }
-
-        .section h2 {
-            color: #1a73e8;
-            margin-bottom: 10px;
-        }
-
-        a {
-            color: #1a73e8;
+        .navbar a {
+            color: white;
             text-decoration: none;
+            font-weight: bold;
         }
 
-        a:hover {
-            text-decoration: underline;
+        .page {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .hero {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            margin-bottom: 24px;
+        }
+
+        .hero h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.2rem;
+            color: #0f172a;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: #475569;
+            font-size: 1rem;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
         }
 
         .badge {
-            display: inline-block;
-            padding: 5px 10px;
-            background: #e3f2fd;
-            color: #1a73e8;
-            border-radius: 5px;
-            margin-right: 5px;
-            margin-bottom: 5px;
+            background: #e2e8f0;
+            color: #0f172a;
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 0.92rem;
+            font-weight: 600;
         }
 
-        .back {
-            margin-bottom: 15px;
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 24px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            margin-bottom: 24px;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            margin-bottom: 18px;
+            color: #0f172a;
+            font-size: 1.35rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            row-gap: 12px;
+            column-gap: 16px;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #334155;
+        }
+
+        .value {
+            color: #1f2937;
+        }
+
+        .sequence-box,
+        .text-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px;
+            margin-top: 10px;
+        }
+
+        .sequence-box {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.94rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.45;
+        }
+
+        .empty {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .list-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 16px;
+            background: #f8fafc;
+        }
+
+        .list-item h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.05rem;
+        }
+
+        .list-item p {
+            margin: 4px 0;
+            color: #475569;
+        }
+
+        .list-item a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .list-item a:hover {
+            text-decoration: underline;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tag {
+            background: #dbeafe;
+            color: #1e3a8a;
+            padding: 8px 14px;
+            border-radius: 999px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.92rem;
+        }
+
+        .tag:hover {
+            background: #bfdbfe;
+        }
+
+        .viz-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .viz-summary {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .viz-stat {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 16px;
+            min-width: 160px;
+        }
+
+        .viz-stat-label {
+            display: block;
+            color: #64748b;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+
+        .viz-stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .relationship-diagram {
+            background: linear-gradient(180deg, #f8fafc, #eef2ff);
+            border: 1px solid #dbeafe;
+            border-radius: 18px;
+            padding: 24px;
+        }
+
+        .diagram-center {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .center-node {
             display: inline-block;
+            background: #0f172a;
+            color: white;
+            padding: 14px 20px;
+            border-radius: 999px;
+            font-weight: 700;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+        }
+
+        .connection-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .connection-row {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 14px;
+            align-items: center;
+        }
+
+        .connector-label {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #334155;
+            text-align: right;
+        }
+
+        .target-bar {
+            position: relative;
+            height: 48px;
+            border-radius: 999px;
+            background: white;
+            border: 1px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            overflow: hidden;
+        }
+
+        .target-hit {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 70px;
+            height: 18px;
+            background: rgba(239, 68, 68, 0.18);
+            border: 1px solid rgba(239, 68, 68, 0.45);
+            border-radius: 999px;
+        }
+
+        .target-name {
+            position: relative;
+            z-index: 2;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .target-meta {
+            position: relative;
+            z-index: 2;
+            margin-left: auto;
+            color: #475569;
+            font-size: 0.88rem;
+            padding-right: 90px;
+        }
+
+        .section-note {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 0.95rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 10px;
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .connection-row {
+                grid-template-columns: 1fr;
+            }
+
+            .connector-label {
+                text-align: left;
+            }
+
+            .target-meta {
+                display: none;
+            }
         }
     </style>
 </head>
-
 <body>
-
-<div class="container">
-
-    <a class="back" href="/">⬅ Back to Search</a>
-
-    <div class="header">
-        <h1>{{ binder.binder_name }}</h1>
-        <p><strong>Modality:</strong> {{ binder.modality_name }}</p>
-        <p><strong>Approval Status:</strong> {{ binder.approval_status }}</p>
-        <p><strong>Molecular Weight:</strong> {{ binder.molecular_weight }}</p>
+    <div class="navbar">
+        <a href="/">Molecular Search Tool</a>
+        <a href="/">Back to Search</a>
     </div>
 
-    <div class="section">
-        <h2>Description</h2>
-        <p>{{ binder.binder_description }}</p>
+    <div class="page">
+        <div class="hero">
+            <h1>{{ binder.binder_name }}</h1>
+            <p class="subtitle">Therapeutic binder detail page</p>
+
+            <div class="badge-row">
+                <span class="badge">Binder Type: {{ binder.binder_type or 'Not available' }}</span>
+                <span class="badge">Clinical Status: {{ binder.clinical_status or binder.approval_status or 'Not available' }}</span>
+                <span class="badge">Modality: {{ binder.modality_name or 'Not available' }}</span>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div>
+                <div class="card">
+                    <h2>Binder Overview</h2>
+                    <div class="info-grid">
+                        <div class="label">Binder Name</div>
+                        <div class="value">{{ binder.binder_name or 'Not available' }}</div>
+
+                        <div class="label">Binder Type</div>
+                        <div class="value">{{ binder.binder_type or 'Not available' }}</div>
+
+                        <div class="label">Clinical Status</div>
+                        <div class="value">{{ binder.clinical_status or binder.approval_status or 'Not available' }}</div>
+
+                        <div class="label">Modality</div>
+                        <div class="value">{{ binder.modality_name or 'Not available' }}</div>
+
+                        <div class="label">Approval Status</div>
+                        <div class="value">{{ binder.approval_status or 'Not available' }}</div>
+
+                        <div class="label">Developer</div>
+                        <div class="value">{{ binder.developer_company or 'Not available' }}</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Associated Diseases</h2>
+                    {% if diseases and diseases|length > 0 %}
+                        <div class="tag-list">
+                            {% for disease in diseases %}
+                                <a class="tag" href="/disease/{{ disease.disease_id }}">
+                                    {{ disease.disease_name }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No disease tags are currently linked to this binder.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Linked Target Visualization</h2>
+
+                    <div class="viz-wrap">
+                        <div class="viz-summary">
+                            <div class="viz-stat">
+                                <span class="viz-stat-label">Linked Targets</span>
+                                <span class="viz-stat-value">{{ proteins|length if proteins else 0 }}</span>
+                            </div>
+                            <div class="viz-stat">
+                                <span class="viz-stat-label">Linked Trials</span>
+                                <span class="viz-stat-value">{{ trials|length if trials else 0 }}</span>
+                            </div>
+                            <div class="viz-stat">
+                                <span class="viz-stat-label">Disease Tags</span>
+                                <span class="viz-stat-value">{{ diseases|length if diseases else 0 }}</span>
+                            </div>
+                        </div>
+
+                        {% if proteins and proteins|length > 0 %}
+                            <div class="relationship-diagram">
+                                <div class="diagram-center">
+                                    <div class="center-node">{{ binder.binder_name }}</div>
+                                </div>
+
+                                <div class="connection-list">
+                                    {% for protein in proteins %}
+                                        <div class="connection-row">
+                                            <div class="connector-label">
+                                                binds →
+                                            </div>
+                                            <div class="target-bar">
+                                                <div class="target-hit"></div>
+                                                <span class="target-name">{{ protein.gene_symbol or protein.protein_name }}</span>
+                                                <span class="target-meta">{{ protein.interaction_type or 'Interaction not available' }}</span>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <p class="section-note">
+                                The red highlighted region is an MVP visual placeholder representing an approximate binding region.
+                                In a later version, this can be replaced with real residue-level or structure-level binding site data.
+                            </p>
+                        {% else %}
+                            <p class="empty">No linked targets are currently available to visualize.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Description</h2>
+                    {% if binder.binder_description %}
+                        <div class="text-box">
+                            {{ binder.binder_description }}
+                        </div>
+                    {% else %}
+                        <p class="empty">No binder description is currently available.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Mechanism of Action</h2>
+                    {% if binder.mechanism_of_action %}
+                        <div class="text-box">
+                            {{ binder.mechanism_of_action }}
+                        </div>
+                    {% else %}
+                        <p class="empty">No mechanism of action is currently available.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Sequence</h2>
+                    {% if binder.sequence %}
+                        <div class="sequence-box">{{ binder.sequence }}</div>
+                    {% else %}
+                        <p class="empty">No sequence is currently available for this binder.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <h2>Linked Targets</h2>
+                    {% if proteins and proteins|length > 0 %}
+                        <div class="list">
+                            {% for protein in proteins %}
+                                <div class="list-item">
+                                    <h3>
+                                        <a href="/protein/{{ protein.protein_id }}">
+                                            {{ protein.gene_symbol or protein.protein_name }}
+                                        </a>
+                                    </h3>
+                                    <p><strong>Protein Name:</strong> {{ protein.protein_name or 'Not available' }}</p>
+                                    <p><strong>Gene Symbol:</strong> {{ protein.gene_symbol or 'Not available' }}</p>
+                                    <p><strong>Interaction Type:</strong> {{ protein.interaction_type or 'Not available' }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No linked targets were found for this binder.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Linked Clinical Trials</h2>
+                    {% if trials and trials|length > 0 %}
+                        <div class="list">
+                            {% for trial in trials %}
+                                <div class="list-item">
+                                    <h3>
+                                        <a href="/trial/{{ trial.trial_id }}">
+                                            {{ trial.nct_id or trial.trial_title }}
+                                        </a>
+                                    </h3>
+                                    <p><strong>Trial Title:</strong> {{ trial.trial_title or 'Not available' }}</p>
+                                    <p><strong>Phase:</strong> {{ trial.phase or 'Not available' }}</p>
+                                    <p><strong>Recruitment Status:</strong> {{ trial.recruitment_status or 'Not available' }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No linked clinical trials were found for this binder.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Linked Structures</h2>
+                    {% if structures and structures|length > 0 %}
+                        <div class="list">
+                            {% for structure in structures %}
+                                <div class="list-item">
+                                    <h3>{{ structure.pdb_id or 'Unknown PDB ID' }}</h3>
+                                    <p><strong>Title:</strong> {{ structure.structure_title or 'Not available' }}</p>
+                                    <p><strong>Experimental Method:</strong> {{ structure.experimental_method or 'Not available' }}</p>
+                                    <p><strong>Resolution:</strong> {{ structure.resolution or 'Not available' }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No linked structures were found for this binder.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Next Sponsor-Aligned Upgrades</h2>
+                    <p class="section-note">
+                        This page now includes an initial binder-to-target visualization.
+                        A future version can add true residue-level binding positions and structure-aware diagrams.
+                    </p>
+                    <a class="back-link" href="/">← Return to Search</a>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <div class="section">
-        <h2>Mechanism of Action</h2>
-        <p>{{ binder.mechanism_of_action }}</p>
-    </div>
-
-    <div class="section">
-        <h2>SMILES</h2>
-        <p style="word-break: break-all;">
-            {{ binder.smiles }}
-        </p>
-    </div>
-
-    <div class="section">
-        <h2>Related Proteins</h2>
-        {% if proteins %}
-            {% for protein in proteins %}
-                <span class="badge">
-                    <a href="/protein/{{ protein.protein_id }}">
-                        {{ protein.protein_name }}
-                    </a>
-                </span>
-            {% endfor %}
-        {% else %}
-            <p>No related proteins found.</p>
-        {% endif %}
-    </div>
-
-    <div class="section">
-        <h2>Related Clinical Trials</h2>
-        {% if trials %}
-            {% for trial in trials %}
-                <span class="badge">
-                    <a href="/trial/{{ trial.trial_id }}">
-                        {{ trial.trial_title }}
-                    </a>
-                </span>
-            {% endfor %}
-        {% else %}
-            <p>No related trials found.</p>
-        {% endif %}
-    </div>
-
-    <div class="section">
-        <h2>Related Structures</h2>
-        {% if structures %}
-            {% for structure in structures %}
-                <span class="badge">
-                    <a href="/structure/{{ structure.structure_id }}">
-                        {{ structure.pdb_id }}
-                    </a>
-                </span>
-            {% endfor %}
-        {% else %}
-            <p>No related structures found.</p>
-        {% endif %}
-    </div>
-
-</div>
-
 </body>
 </html>

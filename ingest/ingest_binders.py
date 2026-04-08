@@ -1,7 +1,6 @@
 import requests
 from ingest.db import get_connection
 
-# ChEMBL endpoints
 CHEMBL_MECHANISM_URL = "https://www.ebi.ac.uk/chembl/api/data/mechanism.json"
 CHEMBL_MOLECULE_URL = "https://www.ebi.ac.uk/chembl/api/data/molecule"
 
@@ -15,14 +14,10 @@ def fetch_mechanisms_for_gene(gene_symbol: str, limit: int = 15):
         "limit": limit,
     }
 
-    # Fallback: many targets won't match via accession using plain symbol.
-    # So we also allow broader search by target name if needed.
     response = requests.get(CHEMBL_MECHANISM_URL, params=params, timeout=45)
     response.raise_for_status()
     data = response.json()
-    mechanisms = data.get("mechanisms", [])
-
-    return mechanisms
+    return data.get("mechanisms", [])
 
 
 def fetch_molecule_details(chembl_molecule_id: str):
@@ -34,16 +29,73 @@ def fetch_molecule_details(chembl_molecule_id: str):
 
 def infer_modality(molecule_record: dict) -> str:
     """
-    Very simple modality inference for alpha.
+    Existing simple modality inference for alpha compatibility.
     """
-    molecule_type = molecule_record.get("molecule_type") or ""
-    molecule_type = molecule_type.lower()
+    molecule_type = (molecule_record.get("molecule_type") or "").lower()
 
     if "antibody" in molecule_type:
         return "Antibody"
     if "protein" in molecule_type or "oligo" in molecule_type or "peptide" in molecule_type:
         return "Peptide"
     return "Small Molecule"
+
+
+def infer_binder_type(molecule_record: dict) -> str:
+    """
+    New sponsor-aligned binder type classification.
+    MVP target types:
+    - IgG
+    - VHH
+    - Peptide
+
+    For now, keep the rules simple and safe.
+    """
+    molecule_type = (molecule_record.get("molecule_type") or "").lower()
+    pref_name = (molecule_record.get("pref_name") or "").lower()
+
+    if "nanobody" in molecule_type or "vhh" in molecule_type or "nanobody" in pref_name or "vhh" in pref_name:
+        return "VHH"
+    if "peptide" in molecule_type or "oligopeptide" in molecule_type:
+        return "Peptide"
+    if "antibody" in molecule_type or "protein" in molecule_type:
+        return "IgG"
+
+    return "Other"
+
+
+def infer_clinical_status(molecule_record: dict) -> str | None:
+    """
+    Convert ChEMBL max_phase into a human-readable clinical status.
+    """
+    max_phase = molecule_record.get("max_phase")
+
+    phase_map = {
+        0: "Preclinical",
+        1: "Phase 1",
+        2: "Phase 2",
+        3: "Phase 3",
+        4: "Approved",
+    }
+
+    if max_phase is None:
+        return None
+
+    return phase_map.get(max_phase, f"Max Phase {max_phase}")
+
+
+def extract_sequence(molecule_record: dict) -> str | None:
+    """
+    Placeholder for sequence extraction.
+
+    ChEMBL small molecules usually will not have a FASTA sequence.
+    Some biologics may require a different endpoint or richer parsing.
+    For task 1, we safely store NULL when sequence is unavailable.
+    """
+    sequence = molecule_record.get("sequence")
+    if sequence:
+        return sequence.strip()
+
+    return None
 
 
 def upsert_source(cur, source_name: str, source_url: str):
@@ -127,30 +179,37 @@ def upsert_binders_for_gene(gene_symbol: str, limit: int = 15):
                 binder_name = molecule.get("pref_name") or molecule_chembl_id
                 mechanism_text = mech.get("mechanism_of_action")
                 action_type = mech.get("action_type")
-                max_phase = molecule.get("max_phase")
-                approval_status = f"Max Phase {max_phase}" if max_phase is not None else None
                 developer_company = None
 
                 modality_name = infer_modality(molecule)
                 modality_id = get_or_create_modality(cur, modality_name)
 
-                smiles = None
-                mw = None
+                binder_type = infer_binder_type(molecule)
+                clinical_status = infer_clinical_status(molecule)
+                sequence = extract_sequence(molecule)
+
+                max_phase = molecule.get("max_phase")
+                approval_status = f"Max Phase {max_phase}" if max_phase is not None else None
+
                 structures = molecule.get("molecule_structures") or {}
                 properties = molecule.get("molecule_properties") or {}
 
                 smiles = structures.get("canonical_smiles")
                 mw_raw = properties.get("full_mwt")
+
                 try:
-                    mw = float(mw_raw) if mw_raw is not None else None
+                    molecular_weight = float(mw_raw) if mw_raw is not None else None
                 except Exception:
-                    mw = None
+                    molecular_weight = None
 
                 cur.execute(
                     """
                     INSERT INTO binders (
                         binder_name,
                         modality_id,
+                        binder_type,
+                        sequence,
+                        clinical_status,
                         binder_description,
                         mechanism_of_action,
                         smiles,
@@ -159,10 +218,13 @@ def upsert_binders_for_gene(gene_symbol: str, limit: int = 15):
                         approval_status,
                         source_id
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (binder_name)
                     DO UPDATE SET
                         modality_id = EXCLUDED.modality_id,
+                        binder_type = EXCLUDED.binder_type,
+                        sequence = COALESCE(EXCLUDED.sequence, binders.sequence),
+                        clinical_status = EXCLUDED.clinical_status,
                         binder_description = EXCLUDED.binder_description,
                         mechanism_of_action = EXCLUDED.mechanism_of_action,
                         smiles = EXCLUDED.smiles,
@@ -175,10 +237,13 @@ def upsert_binders_for_gene(gene_symbol: str, limit: int = 15):
                     (
                         binder_name,
                         modality_id,
+                        binder_type,
+                        sequence,
+                        clinical_status,
                         f"Imported from ChEMBL for {gene_symbol}",
                         mechanism_text,
                         smiles,
-                        mw,
+                        molecular_weight,
                         developer_company,
                         approval_status,
                         source_id,
@@ -212,5 +277,7 @@ def upsert_binders_for_gene(gene_symbol: str, limit: int = 15):
                 )
 
                 inserted += 1
+
+        conn.commit()
 
     print(f"[Binders] Upserted {inserted} binders for {gene_symbol}")
