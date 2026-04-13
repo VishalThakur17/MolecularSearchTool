@@ -3,14 +3,46 @@ from ingest.db import get_connection
 
 CHEMBL_MECHANISM_URL = "https://www.ebi.ac.uk/chembl/api/data/mechanism.json"
 CHEMBL_MOLECULE_URL = "https://www.ebi.ac.uk/chembl/api/data/molecule"
+CHEMBL_TARGET_URL = "https://www.ebi.ac.uk/chembl/api/data/target.json"
 
 
-def fetch_mechanisms_for_gene(gene_symbol: str, limit: int = 15):
+def fetch_target_chembl_ids_for_gene(gene_symbol: str, limit: int = 10):
     """
-    Fetch ChEMBL mechanism records filtered by target gene symbol.
+    Find ChEMBL target IDs associated with a gene symbol.
+    Uses a supported synonym filter instead of the invalid nested filter path.
     """
     params = {
-        "target_components__accession": gene_symbol,
+        "target_synonym__icontains": gene_symbol,
+        "limit": limit,
+    }
+
+    response = requests.get(CHEMBL_TARGET_URL, params=params, timeout=45)
+    response.raise_for_status()
+    data = response.json()
+    targets = data.get("targets", [])
+
+    chembl_ids = []
+    seen = set()
+
+    for target in targets:
+        tid = target.get("target_chembl_id")
+        if not tid or tid in seen:
+            continue
+
+        # Optional quality filter: keep only single protein targets when possible
+        target_type = (target.get("target_type") or "").lower()
+        if target_type and "single protein" not in target_type:
+            continue
+
+        chembl_ids.append(tid)
+        seen.add(tid)
+
+    return chembl_ids
+
+
+def fetch_mechanisms_for_target_chembl_id(target_chembl_id: str, limit: int = 25):
+    params = {
+        "target_chembl_id": target_chembl_id,
         "limit": limit,
     }
 
@@ -28,28 +60,16 @@ def fetch_molecule_details(chembl_molecule_id: str):
 
 
 def infer_modality(molecule_record: dict) -> str:
-    """
-    Existing simple modality inference for alpha compatibility.
-    """
     molecule_type = (molecule_record.get("molecule_type") or "").lower()
 
     if "antibody" in molecule_type:
         return "Antibody"
-    if "protein" in molecule_type or "oligo" in molecule_type or "peptide" in molecule_type:
+    if "protein" in molecule_type or "peptide" in molecule_type or "oligo" in molecule_type:
         return "Peptide"
     return "Small Molecule"
 
 
 def infer_binder_type(molecule_record: dict) -> str:
-    """
-    New sponsor-aligned binder type classification.
-    MVP target types:
-    - IgG
-    - VHH
-    - Peptide
-
-    For now, keep the rules simple and safe.
-    """
     molecule_type = (molecule_record.get("molecule_type") or "").lower()
     pref_name = (molecule_record.get("pref_name") or "").lower()
 
@@ -64,9 +84,6 @@ def infer_binder_type(molecule_record: dict) -> str:
 
 
 def infer_clinical_status(molecule_record: dict) -> str | None:
-    """
-    Convert ChEMBL max_phase into a human-readable clinical status.
-    """
     max_phase = molecule_record.get("max_phase")
 
     phase_map = {
@@ -84,17 +101,9 @@ def infer_clinical_status(molecule_record: dict) -> str | None:
 
 
 def extract_sequence(molecule_record: dict) -> str | None:
-    """
-    Placeholder for sequence extraction.
-
-    ChEMBL small molecules usually will not have a FASTA sequence.
-    Some biologics may require a different endpoint or richer parsing.
-    For task 1, we safely store NULL when sequence is unavailable.
-    """
     sequence = molecule_record.get("sequence")
     if sequence:
         return sequence.strip()
-
     return None
 
 
@@ -132,7 +141,7 @@ def get_protein_id_by_gene(cur, gene_symbol: str):
         SELECT p.protein_id
         FROM proteins p
         JOIN genes g ON p.gene_id = g.gene_id
-        WHERE g.gene_symbol = %s
+        WHERE LOWER(g.gene_symbol) = LOWER(%s)
         LIMIT 1;
         """,
         (gene_symbol,),
@@ -141,143 +150,208 @@ def get_protein_id_by_gene(cur, gene_symbol: str):
     return row[0] if row else None
 
 
-def upsert_binders_for_gene(gene_symbol: str, limit: int = 15):
-    """
-    Pull therapeutic mechanism records from ChEMBL and map them into:
-    - binders
-    - binder_modalities
-    - protein_binders
-    """
-    mechanisms = fetch_mechanisms_for_gene(gene_symbol, limit=limit)
+def binder_already_linked(cur, protein_id: int, binder_id: int) -> bool:
+    cur.execute(
+        """
+        SELECT 1
+        FROM protein_binders
+        WHERE protein_id = %s AND binder_id = %s
+        LIMIT 1;
+        """,
+        (protein_id, binder_id),
+    )
+    return cur.fetchone() is not None
 
-    if not mechanisms:
-        print(f"[Binders] No ChEMBL mechanism records found for {gene_symbol}")
-        return
 
+def upsert_binder(cur, molecule: dict, gene_symbol: str, source_id: int, mechanism_text: str | None):
+    binder_name = molecule.get("pref_name") or molecule.get("molecule_chembl_id")
+    if not binder_name:
+        return None
+
+    modality_name = infer_modality(molecule)
+    modality_id = get_or_create_modality(cur, modality_name)
+
+    binder_type = infer_binder_type(molecule)
+    clinical_status = infer_clinical_status(molecule)
+    sequence = extract_sequence(molecule)
+
+    max_phase = molecule.get("max_phase")
+    approval_status = f"Max Phase {max_phase}" if max_phase is not None else None
+
+    structures = molecule.get("molecule_structures") or {}
+    properties = molecule.get("molecule_properties") or {}
+
+    smiles = structures.get("canonical_smiles")
+    mw_raw = properties.get("full_mwt")
+
+    try:
+        molecular_weight = float(mw_raw) if mw_raw is not None else None
+    except Exception:
+        molecular_weight = None
+
+    cur.execute(
+        """
+        INSERT INTO binders (
+            binder_name,
+            modality_id,
+            binder_type,
+            sequence,
+            clinical_status,
+            binder_description,
+            mechanism_of_action,
+            smiles,
+            molecular_weight,
+            developer_company,
+            approval_status,
+            source_id
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (binder_name)
+        DO UPDATE SET
+            modality_id = EXCLUDED.modality_id,
+            binder_type = EXCLUDED.binder_type,
+            sequence = COALESCE(EXCLUDED.sequence, binders.sequence),
+            clinical_status = COALESCE(EXCLUDED.clinical_status, binders.clinical_status),
+            binder_description = EXCLUDED.binder_description,
+            mechanism_of_action = COALESCE(EXCLUDED.mechanism_of_action, binders.mechanism_of_action),
+            smiles = COALESCE(EXCLUDED.smiles, binders.smiles),
+            molecular_weight = COALESCE(EXCLUDED.molecular_weight, binders.molecular_weight),
+            developer_company = COALESCE(EXCLUDED.developer_company, binders.developer_company),
+            approval_status = COALESCE(EXCLUDED.approval_status, binders.approval_status),
+            source_id = EXCLUDED.source_id
+        RETURNING binder_id;
+        """,
+        (
+            binder_name,
+            modality_id,
+            binder_type,
+            sequence,
+            clinical_status,
+            f"Imported from ChEMBL for {gene_symbol}",
+            mechanism_text,
+            smiles,
+            molecular_weight,
+            None,
+            approval_status,
+            source_id,
+        ),
+    )
+    return cur.fetchone()[0]
+
+
+def link_binder_to_protein(cur, protein_id: int, binder_id: int, action_type: str | None, source_id: int, gene_symbol: str):
+    cur.execute(
+        """
+        INSERT INTO protein_binders (
+            protein_id,
+            binder_id,
+            interaction_type,
+            evidence_summary,
+            source_id
+        )
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (protein_id, binder_id)
+        DO UPDATE SET
+            interaction_type = COALESCE(EXCLUDED.interaction_type, protein_binders.interaction_type),
+            evidence_summary = EXCLUDED.evidence_summary,
+            source_id = EXCLUDED.source_id;
+        """,
+        (
+            protein_id,
+            binder_id,
+            action_type,
+            f"Imported from ChEMBL mechanism data for {gene_symbol}",
+            source_id,
+        ),
+    )
+
+
+def upsert_binders_for_gene(gene_symbol: str, limit_per_target: int = 20):
+    """
+    Main ingestion function for Priority 1:
+    - find ChEMBL targets for a gene symbol
+    - fetch mechanisms for those targets
+    - insert binders
+    - create protein_binders links
+    """
     with get_connection() as conn:
         with conn.cursor() as cur:
-            source_id = upsert_source(cur, "ChEMBL", "https://www.ebi.ac.uk/chembl/")
             protein_id = get_protein_id_by_gene(cur, gene_symbol)
-
             if not protein_id:
-                print(f"[Binders] No protein found in DB for gene {gene_symbol}. Skipping binder linking.")
+                print(f"[Binders] No protein found in DB for gene {gene_symbol}.")
                 return
 
-            inserted = 0
+            source_id = upsert_source(cur, "ChEMBL", "https://www.ebi.ac.uk/chembl/")
 
-            for mech in mechanisms:
-                molecule_chembl_id = mech.get("molecule_chembl_id")
-                if not molecule_chembl_id:
-                    continue
+            target_chembl_ids = fetch_target_chembl_ids_for_gene(gene_symbol)
+            if not target_chembl_ids:
+                print(f"[Binders] No ChEMBL target IDs found for gene {gene_symbol}.")
+                return
 
+            total_mechanisms = 0
+            inserted_binders = 0
+            linked_pairs = 0
+
+            seen_molecule_ids = set()
+
+            for target_chembl_id in target_chembl_ids:
                 try:
-                    molecule = fetch_molecule_details(molecule_chembl_id)
+                    mechanisms = fetch_mechanisms_for_target_chembl_id(
+                        target_chembl_id,
+                        limit=limit_per_target
+                    )
                 except Exception as e:
-                    print(f"[Binders] Failed molecule fetch for {molecule_chembl_id}: {e}")
+                    print(f"[Binders] Failed mechanism fetch for target {target_chembl_id}: {e}")
                     continue
 
-                binder_name = molecule.get("pref_name") or molecule_chembl_id
-                mechanism_text = mech.get("mechanism_of_action")
-                action_type = mech.get("action_type")
-                developer_company = None
+                total_mechanisms += len(mechanisms)
 
-                modality_name = infer_modality(molecule)
-                modality_id = get_or_create_modality(cur, modality_name)
+                for mech in mechanisms:
+                    molecule_chembl_id = mech.get("molecule_chembl_id")
+                    if not molecule_chembl_id or molecule_chembl_id in seen_molecule_ids:
+                        continue
 
-                binder_type = infer_binder_type(molecule)
-                clinical_status = infer_clinical_status(molecule)
-                sequence = extract_sequence(molecule)
+                    seen_molecule_ids.add(molecule_chembl_id)
 
-                max_phase = molecule.get("max_phase")
-                approval_status = f"Max Phase {max_phase}" if max_phase is not None else None
+                    try:
+                        molecule = fetch_molecule_details(molecule_chembl_id)
+                    except Exception as e:
+                        print(f"[Binders] Failed molecule fetch for {molecule_chembl_id}: {e}")
+                        continue
 
-                structures = molecule.get("molecule_structures") or {}
-                properties = molecule.get("molecule_properties") or {}
-
-                smiles = structures.get("canonical_smiles")
-                mw_raw = properties.get("full_mwt")
-
-                try:
-                    molecular_weight = float(mw_raw) if mw_raw is not None else None
-                except Exception:
-                    molecular_weight = None
-
-                cur.execute(
-                    """
-                    INSERT INTO binders (
-                        binder_name,
-                        modality_id,
-                        binder_type,
-                        sequence,
-                        clinical_status,
-                        binder_description,
-                        mechanism_of_action,
-                        smiles,
-                        molecular_weight,
-                        developer_company,
-                        approval_status,
-                        source_id
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (binder_name)
-                    DO UPDATE SET
-                        modality_id = EXCLUDED.modality_id,
-                        binder_type = EXCLUDED.binder_type,
-                        sequence = COALESCE(EXCLUDED.sequence, binders.sequence),
-                        clinical_status = EXCLUDED.clinical_status,
-                        binder_description = EXCLUDED.binder_description,
-                        mechanism_of_action = EXCLUDED.mechanism_of_action,
-                        smiles = EXCLUDED.smiles,
-                        molecular_weight = EXCLUDED.molecular_weight,
-                        developer_company = EXCLUDED.developer_company,
-                        approval_status = EXCLUDED.approval_status,
-                        source_id = EXCLUDED.source_id
-                    RETURNING binder_id;
-                    """,
-                    (
-                        binder_name,
-                        modality_id,
-                        binder_type,
-                        sequence,
-                        clinical_status,
-                        f"Imported from ChEMBL for {gene_symbol}",
-                        mechanism_text,
-                        smiles,
-                        molecular_weight,
-                        developer_company,
-                        approval_status,
+                    binder_id = upsert_binder(
+                        cur,
+                        molecule,
+                        gene_symbol,
                         source_id,
-                    ),
-                )
-                binder_id = cur.fetchone()[0]
-
-                cur.execute(
-                    """
-                    INSERT INTO protein_binders (
-                        protein_id,
-                        binder_id,
-                        interaction_type,
-                        evidence_summary,
-                        source_id
+                        mech.get("mechanism_of_action")
                     )
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (protein_id, binder_id)
-                    DO UPDATE SET
-                        interaction_type = EXCLUDED.interaction_type,
-                        evidence_summary = EXCLUDED.evidence_summary,
-                        source_id = EXCLUDED.source_id;
-                    """,
-                    (
+                    if not binder_id:
+                        continue
+
+                    inserted_binders += 1
+
+                    action_type = mech.get("action_type")
+                    was_linked = binder_already_linked(cur, protein_id, binder_id)
+
+                    link_binder_to_protein(
+                        cur,
                         protein_id,
                         binder_id,
                         action_type,
-                        f"Imported from ChEMBL mechanism data for {gene_symbol}",
                         source_id,
-                    ),
-                )
+                        gene_symbol
+                    )
 
-                inserted += 1
+                    if not was_linked:
+                        linked_pairs += 1
 
-        conn.commit()
+            conn.commit()
 
-    print(f"[Binders] Upserted {inserted} binders for {gene_symbol}")
+    print(
+        f"[Binders] Gene={gene_symbol} | "
+        f"Targets found={len(target_chembl_ids)} | "
+        f"Mechanisms read={total_mechanisms} | "
+        f"Binders upserted={inserted_binders} | "
+        f"New protein-binder links={linked_pairs}"
+    )
