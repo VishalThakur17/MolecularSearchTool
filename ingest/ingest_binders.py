@@ -60,25 +60,68 @@ def fetch_molecule_details(chembl_molecule_id: str):
 
 
 def infer_modality(molecule_record: dict) -> str:
+    """
+    Broad modality bucket used for older UI compatibility.
+    """
     molecule_type = (molecule_record.get("molecule_type") or "").lower()
+    pref_name = (molecule_record.get("pref_name") or "").lower()
 
-    if "antibody" in molecule_type:
+    if any(term in molecule_type for term in ["antibody", "protein", "monoclonal"]):
         return "Antibody"
-    if "protein" in molecule_type or "peptide" in molecule_type or "oligo" in molecule_type:
+
+    if any(term in molecule_type for term in ["peptide", "oligopeptide"]):
         return "Peptide"
+
+    if any(term in pref_name for term in ["mab", "monoclonal"]):
+        return "Antibody"
+
     return "Small Molecule"
 
 
 def infer_binder_type(molecule_record: dict) -> str:
-    molecule_type = (molecule_record.get("molecule_type") or "").lower()
-    pref_name = (molecule_record.get("pref_name") or "").lower()
+    """
+    Sponsor-aligned binder classification.
 
-    if "nanobody" in molecule_type or "vhh" in molecule_type or "nanobody" in pref_name or "vhh" in pref_name:
+    Preferred controlled values:
+    - IgG
+    - VHH
+    - Peptide
+    - Small Molecule
+    - Other
+    """
+    molecule_type = (molecule_record.get("molecule_type") or "").lower().strip()
+    pref_name = (molecule_record.get("pref_name") or "").lower().strip()
+    sequence = (molecule_record.get("sequence") or "").strip()
+
+    # --- VHH / Nanobody ---
+    if any(term in molecule_type for term in ["nanobody", "vhh", "single domain antibody"]):
         return "VHH"
+    if any(term in pref_name for term in [" nanobody", " vhh"]):
+        return "VHH"
+
+    # --- IgG / monoclonal antibody ---
+    if "antibody" in molecule_type or "monoclonal" in molecule_type:
+        return "IgG"
+    if pref_name.endswith("mab") or " monoclonal " in pref_name:
+        return "IgG"
+
+    # --- Peptide ---
     if "peptide" in molecule_type or "oligopeptide" in molecule_type:
         return "Peptide"
-    if "antibody" in molecule_type or "protein" in molecule_type:
-        return "IgG"
+    if sequence:
+        seq_len = len(sequence.replace("\n", "").replace(" ", ""))
+        if 2 <= seq_len <= 80:
+            return "Peptide"
+
+    # --- Small molecule ---
+    if molecule_type in ["small molecule", "synthetic small molecule", ""]:
+        # empty string often happens for small-molecule style records from noisy sources
+        if pref_name and not pref_name.endswith("mab"):
+            return "Small Molecule"
+
+    # fallback pattern-based small-molecule hint
+    if molecule_type and "molecule" in molecule_type and "antibody" not in molecule_type and "peptide" not in molecule_type:
+        return "Small Molecule"
 
     return "Other"
 

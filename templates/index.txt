@@ -1,393 +1,974 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Molecular Search Tool</title>
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Molecular Search Tool</title>
+  <style>
+    :root {
+      --bg: #f7fbff;
+      --bg-2: #eef7ff;
+      --panel: rgba(255, 255, 255, 0.96);
+      --line: rgba(96, 165, 250, 0.14);
+      --text: #0f172a;
+      --muted: #516277;
+      --blue: #60a5fa;
+      --blue-soft: #dbeafe;
+      --blue-deep: #2563eb;
+      --shadow: 0 16px 44px rgba(96, 165, 250, 0.14);
+      --max: 1380px;
+    }
 
-        body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #f5f7fb;
-            color: #1f2937;
-        }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
 
-        .header {
-            background: #0f172a;
-            color: white;
-            padding: 28px 20px;
-            text-align: center;
-        }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(191, 219, 254, 0.45), transparent 28%),
+        radial-gradient(circle at top right, rgba(219, 234, 254, 0.5), transparent 28%),
+        linear-gradient(180deg, #fcfeff 0%, #f7fbff 52%, #eef7ff 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
 
-        .header h1 {
-            margin: 0 0 8px 0;
-            font-size: 2rem;
-        }
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
 
-        .header p {
-            margin: 0;
-            color: #cbd5e1;
-        }
+    .page-shell {
+      position: relative;
+      overflow: hidden;
+    }
 
-        .container {
-            max-width: 1200px;
-            margin: 30px auto;
-            padding: 0 20px 40px;
-        }
+    .bg-orb {
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(90px);
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 0;
+    }
 
-        .search-card,
-        .summary-card,
-        .results-card {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-            padding: 24px;
-            margin-bottom: 24px;
-        }
+    .orb-1 {
+      width: 260px;
+      height: 260px;
+      background: #dbeafe;
+      top: 100px;
+      left: -40px;
+    }
 
-        .search-form {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr auto;
-            gap: 14px;
-            align-items: end;
-        }
+    .orb-2 {
+      width: 320px;
+      height: 320px;
+      background: #e0f2fe;
+      top: 220px;
+      right: -80px;
+    }
 
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
+    .orb-3 {
+      width: 240px;
+      height: 240px;
+      background: #bfdbfe;
+      bottom: 120px;
+      left: 20%;
+    }
 
-        .form-group label {
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #334155;
-        }
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 22px;
+      position: relative;
+      z-index: 1;
+    }
 
-        .form-group input,
-        .form-group select {
-            padding: 12px 14px;
-            border: 1px solid #cbd5e1;
-            border-radius: 10px;
-            font-size: 0.96rem;
-        }
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.82);
+      border-bottom: 1px solid rgba(96, 165, 250, 0.12);
+    }
 
-        .search-btn {
-            padding: 12px 18px;
-            background: #2563eb;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-weight: bold;
-            cursor: pointer;
-        }
+    .nav-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
 
-        .search-btn:hover {
-            background: #1d4ed8;
-        }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
 
-        .section-title {
-            margin-top: 0;
-            margin-bottom: 16px;
-            color: #0f172a;
-        }
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #eff6ff, #dbeafe);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      display: grid;
+      place-items: center;
+      box-shadow: inset 0 0 12px rgba(96, 165, 250, 0.08);
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--blue-deep);
+    }
 
-        .intent-badge {
-            display: inline-block;
-            background: #dbeafe;
-            color: #1e3a8a;
-            padding: 8px 14px;
-            border-radius: 999px;
-            font-size: 0.9rem;
-            font-weight: 700;
-            margin-bottom: 14px;
-        }
+    .brand-title {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
 
-        .result-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 14px;
-        }
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 2px;
+    }
 
-        .result-item {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            padding: 16px;
-        }
+    .hero {
+      padding: 42px 0 28px;
+    }
 
-        .result-item h3 {
-            margin: 0 0 8px 0;
-        }
+    .hero-panel {
+      background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,249,255,0.98));
+      border: 1px solid rgba(96, 165, 250, 0.16);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
 
-        .result-item p {
-            margin: 4px 0;
-            color: #475569;
-        }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 28px;
+      padding: 34px;
+    }
 
-        .result-item a {
-            color: #2563eb;
-            text-decoration: none;
-            font-weight: 600;
-        }
+    .hero-left {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
 
-        .result-item a:hover {
-            text-decoration: underline;
-        }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      align-self: flex-start;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #eff6ff;
+      border: 1px solid rgba(96, 165, 250, 0.16);
+      color: var(--blue-deep);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
 
-        .summary-text {
-            line-height: 1.6;
-            color: #334155;
-        }
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2.2rem, 5vw, 4rem);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      max-width: 760px;
+    }
 
-        .error {
-            color: #b91c1c;
-            font-weight: 600;
-        }
+    .hero h1 .accent {
+      background: linear-gradient(90deg, #60a5fa, #38bdf8, #2563eb);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
 
-        .empty {
-            color: #64748b;
-            font-style: italic;
-        }
+    .hero p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 1.03rem;
+      line-height: 1.7;
+    }
 
-        @media (max-width: 1050px) {
-            .search-form {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hero-badge {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      color: var(--muted);
+      font-size: 0.9rem;
+      box-shadow: 0 10px 24px rgba(96, 165, 250, 0.08);
+    }
+
+    .hero-right {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .mini-panel {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 14px 34px rgba(96, 165, 250, 0.08);
+    }
+
+    .mini-panel h3 {
+      margin: 0 0 8px 0;
+      font-size: 1rem;
+    }
+
+    .mini-panel p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.94rem;
+    }
+
+    .search-shell {
+      padding-bottom: 18px;
+    }
+
+    .search-panel {
+      background: var(--panel);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      box-shadow: var(--shadow);
+      border-radius: 28px;
+      padding: 24px;
+    }
+
+    .search-form {
+      display: grid;
+      gap: 16px;
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: 1.8fr 0.8fr 0.8fr 0.9fr auto;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(96, 165, 250, 0.18);
+      background: #fff;
+      font-size: 0.98rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      min-height: 50px;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: rgba(37, 99, 235, 0.4);
+      box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .btn {
+      border: 0;
+      cursor: pointer;
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      min-height: 50px;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #60a5fa, #2563eb);
+      color: white;
+      box-shadow: 0 16px 24px rgba(37, 99, 235, 0.22);
+    }
+
+    .btn-secondary {
+      background: #eff6ff;
+      color: var(--blue-deep);
+      border: 1px solid rgba(96, 165, 250, 0.16);
+    }
+
+    .quick-searches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .quick-link {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #f8fbff;
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      color: var(--muted);
+      font-size: 0.9rem;
+      transition: all 0.18s ease;
+    }
+
+    .quick-link:hover {
+      background: #eff6ff;
+      color: var(--blue-deep);
+      border-color: rgba(96, 165, 250, 0.22);
+    }
+
+    .results-shell {
+      padding: 6px 0 56px;
+    }
+
+    .message {
+      padding: 16px 18px;
+      border-radius: 18px;
+      margin-bottom: 18px;
+      line-height: 1.65;
+      border: 1px solid transparent;
+    }
+
+    .message-info {
+      background: #eff6ff;
+      color: #1e3a8a;
+      border-color: rgba(96, 165, 250, 0.16);
+    }
+
+    .message-error {
+      background: #fef2f2;
+      color: #991b1b;
+      border-color: rgba(239, 68, 68, 0.18);
+    }
+
+    .summary-card {
+      background: #ffffff;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      box-shadow: var(--shadow);
+      border-radius: 24px;
+      padding: 22px;
+      margin-bottom: 22px;
+    }
+
+    .summary-title {
+      font-size: 0.92rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--blue-deep);
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .summary-text {
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 0.98rem;
+    }
+
+    .result-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .meta-pill {
+      background: #ffffff;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .section-grid {
+      display: grid;
+      gap: 20px;
+    }
+
+    .result-section {
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 26px;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .result-section.primary {
+      border-color: rgba(37, 99, 235, 0.24);
+      box-shadow: 0 18px 42px rgba(37, 99, 235, 0.16);
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 22px 24px;
+      border-bottom: 1px solid rgba(96, 165, 250, 0.1);
+      background: linear-gradient(180deg, rgba(248, 252, 255, 0.96), rgba(255,255,255,0.96));
+    }
+
+    .section-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .section-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 1rem;
+      background: #eff6ff;
+      color: var(--blue-deep);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+    }
+
+    .section-title {
+      font-size: 1.12rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+
+    .section-subtitle {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-top: 4px;
+    }
+
+    .section-count {
+      background: #eff6ff;
+      color: var(--blue-deep);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      white-space: nowrap;
+    }
+
+    .cards {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, #ffffff, #fbfdff);
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 12px 28px rgba(96, 165, 250, 0.08);
+      transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(96, 165, 250, 0.2);
+      box-shadow: 0 18px 36px rgba(96, 165, 250, 0.12);
+    }
+
+    .card h3 {
+      margin: 0 0 10px 0;
+      font-size: 1.08rem;
+      letter-spacing: -0.01em;
+    }
+
+    .card h3 a {
+      color: var(--text);
+    }
+
+    .card h3 a:hover {
+      color: var(--blue-deep);
+    }
+
+    .card p {
+      margin: 6px 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.94rem;
+    }
+
+    .label {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .card-tag {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #f0f9ff;
+      color: #0369a1;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1px solid rgba(56, 189, 248, 0.12);
+    }
+
+    .explore-block {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(96, 165, 250, 0.12);
+    }
+
+    .explore-title {
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--blue-deep);
+      margin-bottom: 10px;
+    }
+
+    .explore-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .explore-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 0.84rem;
+      font-weight: 700;
+      border: 1px solid rgba(96, 165, 250, 0.16);
+    }
+
+    .explore-link:hover {
+      background: #dbeafe;
+    }
+
+    .empty-state {
+      padding: 18px 24px 26px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .footer-space {
+      height: 30px;
+    }
+
+    @media (max-width: 1100px) {
+      .hero-grid,
+      .search-row {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        align-items: stretch;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-inner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .section-head {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Molecular Search Tool</h1>
-        <p>Binder–Target intelligence platform for therapeutic discovery</p>
+  <div class="page-shell">
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <div class="navbar">
+      <div class="nav-inner">
+        <div class="brand">
+          <div class="brand-mark">MS</div>
+          <div>
+            <div class="brand-title">Molecular Search Tool</div>
+            <div class="brand-subtitle">Binder-target intelligence for translational research</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="container">
-        <div class="search-card">
-            <form method="GET" action="/" class="search-form">
-                <div class="form-group">
-                    <label for="q">Search</label>
-                    <input
-                        type="text"
-                        id="q"
-                        name="q"
-                        placeholder="Search disease, protein, binder, trial, or FASTA sequence"
-                        value="{{ query or '' }}"
-                    >
-                </div>
-
-                <div class="form-group">
-                    <label for="binder_type">Binder Type</label>
-                    <select id="binder_type" name="binder_type">
-                        <option value="">All</option>
-                        {% for item in filter_options.binder_types %}
-                            <option value="{{ item }}" {% if selected_binder_type == item %}selected{% endif %}>
-                                {{ item }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="clinical_status">Clinical Status</label>
-                    <select id="clinical_status" name="clinical_status">
-                        <option value="">All</option>
-                        {% for item in filter_options.clinical_statuses %}
-                            <option value="{{ item }}" {% if selected_clinical_status == item %}selected{% endif %}>
-                                {{ item }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="disease_name">Disease Tag</label>
-                    <select id="disease_name" name="disease_name">
-                        <option value="">All</option>
-                        {% for item in filter_options.diseases %}
-                            <option value="{{ item }}" {% if selected_disease_name == item %}selected{% endif %}>
-                                {{ item }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <button type="submit" class="search-btn">Search</button>
-            </form>
-        </div>
-
-        {% if error %}
-            <div class="results-card">
-                <p class="error">{{ error }}</p>
+      <section class="hero">
+        <div class="hero-panel">
+          <div class="hero-grid">
+            <div class="hero-left">
+              <div class="eyebrow">Connected Search Exploration</div>
+              <h1>Search across <span class="accent">targets, binders, trials,</span> and disease context</h1>
+              <p>
+                Exact target-style queries can go directly to a protein page, binder-style queries stay in a binder-first results flow,
+                and each result card now includes quick exploration links so users can keep moving through connected biology and therapeutic context.
+              </p>
+              <div class="hero-badges">
+                <div class="hero-badge">EGFR → target page</div>
+                <div class="hero-badge">EGFR binders → binder results</div>
+                <div class="hero-badge">lung cancer → disease-tag filtered results</div>
+                <div class="hero-badge">Every card → next-step links</div>
+              </div>
             </div>
+            <div class="hero-right">
+              <div class="mini-panel">
+                <h3>Recommended searches</h3>
+                <p>Try target names, binder names, disease terms, or clinical trial IDs to test the routing and connected exploration behavior.</p>
+              </div>
+              <div class="mini-panel">
+                <h3>Exploration-first flow</h3>
+                <p>Search results are no longer just static cards. Each card now suggests meaningful next steps into binders, proteins, diseases, and trials.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="search-shell">
+        <div class="search-panel">
+          <form class="search-form" method="GET" action="/">
+            <div class="search-row">
+              <div class="field">
+                <label for="q">Search</label>
+                <input
+                  id="q"
+                  name="q"
+                  type="text"
+                  value="{{ query or '' }}"
+                  placeholder="Try EGFR, EGFR binders, lung cancer, Cetuximab, or an NCT ID"
+                />
+              </div>
+
+              <div class="field">
+                <label for="binder_type">Binder Type</label>
+                <select id="binder_type" name="binder_type">
+                  <option value="">All binder types</option>
+                  {% for item in filter_options.binder_types %}
+                    <option value="{{ item }}" {% if selected_binder_type == item %}selected{% endif %}>{{ item }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="clinical_status">Clinical Status</label>
+                <select id="clinical_status" name="clinical_status">
+                  <option value="">All clinical statuses</option>
+                  {% for item in filter_options.clinical_statuses %}
+                    <option value="{{ item }}" {% if selected_clinical_status == item %}selected{% endif %}>{{ item }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="disease_name">Disease Filter</label>
+                <select id="disease_name" name="disease_name">
+                  <option value="">All diseases</option>
+                  {% for item in filter_options.diseases %}
+                    <option value="{{ item }}" {% if selected_disease_name == item %}selected{% endif %}>{{ item }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="actions">
+                <button class="btn btn-primary" type="submit">Search</button>
+                <a class="btn btn-secondary" href="/">Clear</a>
+              </div>
+            </div>
+
+            <div class="quick-searches">
+              <a class="quick-link" href="/?q=EGFR">EGFR</a>
+              <a class="quick-link" href="/?q=EGFR+binders">EGFR binders</a>
+              <a class="quick-link" href="/?q=lung+cancer">lung cancer</a>
+              <a class="quick-link" href="/?q=HER2">HER2</a>
+              <a class="quick-link" href="/?q=Cetuximab">Cetuximab</a>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="results-shell">
+        {% if error %}
+          <div class="message message-error">
+            <strong>Error:</strong> {{ error }}
+          </div>
+        {% endif %}
+
+        {% if route_hint %}
+          <div class="message message-info">
+            {{ route_hint }}
+          </div>
         {% endif %}
 
         {% if summary %}
-            <div class="summary-card">
-                {% if results and results.intent %}
-                    <div class="intent-badge">
-                        Interpreted Query Type: {{ results.intent|capitalize }}
-                    </div>
-                {% endif %}
-                <h2 class="section-title">Summary</h2>
-                <p class="summary-text">{{ summary }}</p>
-            </div>
+          <div class="summary-card">
+            <div class="summary-title">Result Summary</div>
+            <div class="summary-text">{{ summary }}</div>
+          </div>
         {% endif %}
 
         {% if results %}
-            {% if results.primary_section == 'proteins' %}
-                <div class="results-card">
-                    <h2 class="section-title">Primary Protein Results</h2>
-                    {% if results.proteins and results.proteins|length > 0 %}
-                        <div class="result-grid">
-                            {% for protein in results.proteins %}
-                                <div class="result-item">
-                                    <h3>
-                                        <a href="/protein/{{ protein.protein_id }}">
-                                            {{ protein.gene_symbol or protein.protein_name }}
-                                        </a>
-                                    </h3>
-                                    <p><strong>Protein Name:</strong> {{ protein.protein_name or 'Not available' }}</p>
-                                    <p><strong>UniProt:</strong> {{ protein.uniprot_accession or 'Not available' }}</p>
-                                    <p><strong>Organism:</strong> {{ protein.organism_name or 'Not available' }}</p>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="empty">No protein results found.</p>
-                    {% endif %}
-                </div>
-            {% elif results.primary_section == 'diseases' %}
-                <div class="results-card">
-                    <h2 class="section-title">Primary Disease Results</h2>
-                    {% if results.diseases and results.diseases|length > 0 %}
-                        <div class="result-grid">
-                            {% for disease in results.diseases %}
-                                <div class="result-item">
-                                    <h3>
-                                        <a href="/disease/{{ disease.disease_id }}">{{ disease.disease_name }}</a>
-                                    </h3>
-                                    <p><strong>Category:</strong> {{ disease.disease_category or 'Not available' }}</p>
-                                    <p><strong>Description:</strong> {{ disease.description or 'Not available' }}</p>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="empty">No disease results found.</p>
-                    {% endif %}
-                </div>
-            {% else %}
-                <div class="results-card">
-                    <h2 class="section-title">Primary Binder Results</h2>
-                    {% if results.binders and results.binders|length > 0 %}
-                        <div class="result-grid">
-                            {% for binder in results.binders %}
-                                <div class="result-item">
-                                    <h3>
-                                        <a href="/binder/{{ binder.binder_id }}">{{ binder.binder_name }}</a>
-                                    </h3>
-                                    <p><strong>Binder Type:</strong> {{ binder.binder_type or 'Not available' }}</p>
-                                    <p><strong>Clinical Status:</strong> {{ binder.clinical_status or binder.approval_status or 'Not available' }}</p>
-                                    <p><strong>Modality:</strong> {{ binder.modality_name or 'Not available' }}</p>
-                                    <p><strong>Mechanism:</strong> {{ binder.mechanism_of_action or 'Not available' }}</p>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="empty">No binder results found.</p>
-                    {% endif %}
-                </div>
+          <div class="result-meta">
+            <div class="meta-pill">Original query: {{ query }}</div>
+            {% if effective_query and effective_query != query %}
+              <div class="meta-pill">Search term used for matching: {{ effective_query }}</div>
             {% endif %}
+            <div class="meta-pill">Intent: {{ results.intent }}</div>
+            <div class="meta-pill">Primary section: {{ results.primary_section }}</div>
+          </div>
 
-            <div class="results-card">
-                <h2 class="section-title">Binder Results</h2>
-                {% if results.binders and results.binders|length > 0 %}
-                    <div class="result-grid">
-                        {% for binder in results.binders %}
-                            <div class="result-item">
-                                <h3>
-                                    <a href="/binder/{{ binder.binder_id }}">{{ binder.binder_name }}</a>
-                                </h3>
-                                <p><strong>Binder Type:</strong> {{ binder.binder_type or 'Not available' }}</p>
-                                <p><strong>Clinical Status:</strong> {{ binder.clinical_status or binder.approval_status or 'Not available' }}</p>
-                                <p><strong>Modality:</strong> {{ binder.modality_name or 'Not available' }}</p>
-                                <p><strong>Mechanism:</strong> {{ binder.mechanism_of_action or 'Not available' }}</p>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="empty">No binder results found.</p>
-                {% endif %}
-            </div>
+          <div class="section-grid">
+            {% for section_name in results.section_order %}
+              {% set items = results[section_name] %}
+              {% set is_primary = results.primary_section == section_name %}
+              {% if section_name == 'binders' %}
+                {% set title = 'Therapeutic Binders' %}
+                {% set subtitle = 'Primary therapeutic objects and linked intervention molecules' %}
+                {% set icon = 'B' %}
+              {% elif section_name == 'proteins' %}
+                {% set title = 'Protein Targets' %}
+                {% set subtitle = 'Biological targets connected to binders and diseases' %}
+                {% set icon = 'P' %}
+              {% elif section_name == 'trials' %}
+                {% set title = 'Clinical Trials' %}
+                {% set subtitle = 'Validation and translational evidence layer' %}
+                {% set icon = 'T' %}
+              {% else %}
+                {% set title = 'Disease Context' %}
+                {% set subtitle = 'Disease tags and contextual disease records' %}
+                {% set icon = 'D' %}
+              {% endif %}
 
-            <div class="results-card">
-                <h2 class="section-title">Protein Results</h2>
-                {% if results.proteins and results.proteins|length > 0 %}
-                    <div class="result-grid">
-                        {% for protein in results.proteins %}
-                            <div class="result-item">
-                                <h3>
-                                    <a href="/protein/{{ protein.protein_id }}">
-                                        {{ protein.gene_symbol or protein.protein_name }}
-                                    </a>
-                                </h3>
-                                <p><strong>Protein Name:</strong> {{ protein.protein_name or 'Not available' }}</p>
-                                <p><strong>UniProt:</strong> {{ protein.uniprot_accession or 'Not available' }}</p>
-                                <p><strong>Organism:</strong> {{ protein.organism_name or 'Not available' }}</p>
-                            </div>
-                        {% endfor %}
+              <div class="result-section {% if is_primary %}primary{% endif %}">
+                <div class="section-head">
+                  <div class="section-title-wrap">
+                    <div class="section-icon">{{ icon }}</div>
+                    <div>
+                      <div class="section-title">
+                        {{ title }}
+                        {% if is_primary %}
+                          · Primary
+                        {% endif %}
+                      </div>
+                      <div class="section-subtitle">{{ subtitle }}</div>
                     </div>
-                {% else %}
-                    <p class="empty">No protein results found.</p>
-                {% endif %}
-            </div>
+                  </div>
+                  <div class="section-count">{{ items|length }} result{% if items|length != 1 %}s{% endif %}</div>
+                </div>
 
-            <div class="results-card">
-                <h2 class="section-title">Disease Results</h2>
-                {% if results.diseases and results.diseases|length > 0 %}
-                    <div class="result-grid">
-                        {% for disease in results.diseases %}
-                            <div class="result-item">
-                                <h3>
-                                    <a href="/disease/{{ disease.disease_id }}">{{ disease.disease_name }}</a>
-                                </h3>
-                                <p><strong>Category:</strong> {{ disease.disease_category or 'Not available' }}</p>
-                                <p><strong>Description:</strong> {{ disease.description or 'Not available' }}</p>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="empty">No disease results found.</p>
-                {% endif %}
-            </div>
+                {% if items and items|length > 0 %}
+                  <div class="cards">
+                    {% if section_name == 'binders' %}
+                      {% for item in items %}
+                        <div class="card">
+                          <h3><a href="/binder/{{ item.binder_id }}">{{ item.binder_name }}</a></h3>
+                          <p><span class="label">Binder Type:</span> {{ item.binder_type or 'Not available' }}</p>
+                          <p><span class="label">Clinical Status:</span> {{ item.clinical_status or item.approval_status or 'Not available' }}</p>
+                          <p><span class="label">Modality:</span> {{ item.modality_name or 'Not available' }}</p>
+                          <p><span class="label">Mechanism:</span> {{ item.mechanism_of_action or 'Not available' }}</p>
 
-            <div class="results-card">
-                <h2 class="section-title">Clinical Trial Results</h2>
-                {% if results.trials and results.trials|length > 0 %}
-                    <div class="result-grid">
-                        {% for trial in results.trials %}
-                            <div class="result-item">
-                                <h3>
-                                    <a href="/trial/{{ trial.trial_id }}">
-                                        {{ trial.nct_id or trial.trial_title }}
-                                    </a>
-                                </h3>
-                                <p><strong>Title:</strong> {{ trial.trial_title or 'Not available' }}</p>
-                                <p><strong>Condition:</strong> {{ trial.condition_name or 'Not available' }}</p>
-                                <p><strong>Phase:</strong> {{ trial.phase or 'Not available' }}</p>
-                                <p><strong>Recruitment Status:</strong> {{ trial.recruitment_status or 'Not available' }}</p>
+                          {% if item.linked_targets_preview %}
+                            <p><span class="label">Targets:</span>
+                              {% for target in item.linked_targets_preview %}
+                                {{ target.label }}{% if not loop.last %}, {% endif %}
+                              {% endfor %}
+                              {% if item.linked_target_count > item.linked_targets_preview|length %}
+                                +{{ item.linked_target_count - item.linked_targets_preview|length }} more
+                              {% endif %}
+                            </p>
+                          {% endif %}
+
+                          <div class="card-tags">
+                            <span class="card-tag">Binder-first result</span>
+                            {% if item.sequence %}
+                              <span class="card-tag">Sequence available</span>
+                            {% endif %}
+                            {% if item.linked_target_count %}
+                              <span class="card-tag">{{ item.linked_target_count }} linked target{% if item.linked_target_count != 1 %}s{% endif %}</span>
+                            {% endif %}
+                          </div>
+
+                          <div class="explore-block">
+                            <div class="explore-title">Keep Exploring</div>
+                            <div class="explore-links">
+                              <a class="explore-link" href="/binder/{{ item.binder_id }}">Open binder page</a>
+
+                              {% if item.linked_targets_preview %}
+                                <a class="explore-link" href="/protein/{{ item.linked_targets_preview[0].protein_id }}">Open top target</a>
+                              {% endif %}
+
+                              <a class="explore-link" href="/?q={{ item.binder_name | urlencode }}+trials">Find linked trials</a>
+
+                              {% if item.linked_diseases_preview %}
+                                <a class="explore-link" href="/?q={{ item.linked_diseases_preview[0] | urlencode }}">Explore disease context</a>
+                              {% endif %}
                             </div>
-                        {% endfor %}
-                    </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    {% elif section_name == 'proteins' %}
+                      {% for item in items %}
+                        <div class="card">
+                          <h3><a href="/protein/{{ item.protein_id }}">{{ item.gene_symbol or item.protein_name }}</a></h3>
+                          <p><span class="label">Protein Name:</span> {{ item.protein_name or 'Not available' }}</p>
+                          <p><span class="label">Gene:</span> {{ item.gene_name or item.gene_symbol or 'Not available' }}</p>
+                          <p><span class="label">UniProt:</span> {{ item.uniprot_accession or 'Not available' }}</p>
+                          <p><span class="label">Organism:</span> {{ item.organism_name or 'Not available' }}</p>
+
+                          <div class="card-tags">
+                            {% if item.linked_binder_count %}
+                              <span class="card-tag">{{ item.linked_binder_count }} linked binder{% if item.linked_binder_count != 1 %}s{% endif %}</span>
+                            {% endif %}
+                            {% if item.linked_trial_count %}
+                              <span class="card-tag">{{ item.linked_trial_count }} linked trial{% if item.linked_trial_count != 1 %}s{% endif %}</span>
+                            {% endif %}
+                          </div>
+
+                          <div class="explore-block">
+                            <div class="explore-title">Keep Exploring</div>
+                            <div class="explore-links">
+                              <a class="explore-link" href="/protein/{{ item.protein_id }}">Open protein page</a>
+                              <a class="explore-link" href="/?q={{ (item.gene_symbol or item.protein_name) | urlencode }}+binders">Find binders</a>
+                              <a class="explore-link" href="/?q={{ (item.gene_symbol or item.protein_name) | urlencode }}+trials">Find trials</a>
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    {% elif section_name == 'trials' %}
+                      {% for item in items %}
+                        <div class="card">
+                          <h3><a href="/trial/{{ item.trial_id }}">{{ item.nct_id or item.trial_title }}</a></h3>
+                          <p><span class="label">Title:</span> {{ item.trial_title or 'Not available' }}</p>
+                          <p><span class="label">Condition:</span> {{ item.condition_name or 'Not available' }}</p>
+                          <p><span class="label">Phase:</span> {{ item.phase or 'Not available' }}</p>
+                          <p><span class="label">Recruitment:</span> {{ item.recruitment_status or 'Not available' }}</p>
+
+                          {% if item.linked_diseases_preview %}
+                            <p><span class="label">Disease Context:</span>
+                              {% for disease_name in item.linked_diseases_preview %}
+                                {{ disease_name }}{% if not loop.last %}, {% endif %}
+                              {% endfor %}
+                            </p>
+                          {% endif %}
+
+                          <div class="card-tags">
+                            {% if item.linked_binder_count %}
+                              <span class="card-tag">{{ item.linked_binder_count }} linked binder{% if item.linked_binder_count != 1 %}s{% endif %}</span>
+                            {% endif %}
+                          </div>
+
+                          <div class="explore-block">
+                            <div class="explore-title">Keep Exploring</div>
+                            <div class="explore-links">
+                              <a class="explore-link" href="/trial/{{ item.trial_id }}">Open trial page</a>
+                              <a class="explore-link" href="/?q={{ (item.nct_id or item.trial_title) | urlencode }}+binders">Find linked binders</a>
+                              {% if item.linked_diseases_preview %}
+                                <a class="explore-link" href="/?q={{ item.linked_diseases_preview[0] | urlencode }}">Explore disease context</a>
+                              {% endif %}
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    {% else %}
+                      {% for item in items %}
+                        <div class="card">
+                          <h3><a href="/disease/{{ item.disease_id }}">{{ item.disease_name }}</a></h3>
+                          <p><span class="label">Category:</span> {{ item.disease_category or 'Not available' }}</p>
+                          <p><span class="label">Description:</span> {{ item.description or 'Not available' }}</p>
+
+                          <div class="card-tags">
+                            <span class="card-tag">Disease context</span>
+                            {% if item.linked_binder_count %}
+                              <span class="card-tag">{{ item.linked_binder_count }} linked binder{% if item.linked_binder_count != 1 %}s{% endif %}</span>
+                            {% endif %}
+                            {% if item.linked_trial_count %}
+                              <span class="card-tag">{{ item.linked_trial_count }} linked trial{% if item.linked_trial_count != 1 %}s{% endif %}</span>
+                            {% endif %}
+                          </div>
+
+                          <div class="explore-block">
+                            <div class="explore-title">Keep Exploring</div>
+                            <div class="explore-links">
+                              <a class="explore-link" href="/disease/{{ item.disease_id }}">Open disease page</a>
+                              <a class="explore-link" href="/?q={{ item.disease_name | urlencode }}+binders">Find binders</a>
+                              <a class="explore-link" href="/?q={{ item.disease_name | urlencode }}+trials">Find trials</a>
+                            </div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    {% endif %}
+                  </div>
                 {% else %}
-                    <p class="empty">No clinical trial results found.</p>
+                  <div class="empty-state">
+                    No results were returned in this section for the current search and filter combination.
+                  </div>
                 {% endif %}
-            </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% elif query %}
+          <div class="message message-info">
+            The search completed, but no records were returned.
+          </div>
         {% endif %}
+      </section>
+
+      <div class="footer-space"></div>
     </div>
+  </div>
 </body>
 </html>

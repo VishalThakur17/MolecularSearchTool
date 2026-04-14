@@ -1,351 +1,493 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ disease.disease_name }} - Molecular Search Tool</title>
-  <style>
-    :root {
-      --text: #0f172a;
-      --muted: #516277;
-      --muted-2: #6f85a0;
-      --blue-deep: #2563eb;
-      --line: rgba(96, 165, 250, 0.14);
-      --shadow: 0 16px 44px rgba(96, 165, 250, 0.14);
-      --max: 1380px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ disease.disease_name }} | Molecular Search Tool</title>
+    <style>
+        * { box-sizing: border-box; }
 
-    * { box-sizing: border-box; }
+        :root {
+            --bg: #f5f7fb;
+            --panel: #ffffff;
+            --line: #e2e8f0;
+            --soft: #f8fafc;
+            --text: #0f172a;
+            --muted: #475569;
+            --blue: #2563eb;
+            --blue-soft: #dbeafe;
+            --navy: #0f172a;
+            --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+        }
 
-    body {
-      margin: 0;
-      font-family: Inter, Arial, Helvetica, sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(191, 219, 254, 0.45), transparent 28%),
-        radial-gradient(circle at top right, rgba(219, 234, 254, 0.5), transparent 28%),
-        linear-gradient(180deg, #fcfeff 0%, #f7fbff 52%, #eef7ff 100%);
-      color: var(--text);
-    }
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
 
-    a { color: inherit; text-decoration: none; }
+        .navbar {
+            background: var(--navy);
+            color: white;
+            padding: 16px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-    .container {
-      max-width: var(--max);
-      margin: 0 auto;
-      padding: 28px 22px 50px;
-    }
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
 
-    .back-link {
-      color: var(--blue-deep);
-      font-weight: 700;
-    }
+        .page {
+            max-width: 1280px;
+            margin: 30px auto;
+            padding: 0 20px 40px;
+        }
 
-    .back-link:hover { text-decoration: underline; }
+        .hero {
+            background: linear-gradient(135deg, #ffffff, #eef4ff);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+            border: 1px solid #dbeafe;
+        }
 
-    .hero, .panel {
-      background: rgba(255, 255, 255, 0.96);
-      border: 1px solid rgba(96, 165, 250, 0.14);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-    }
+        .eyebrow {
+            display: inline-block;
+            margin-bottom: 14px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: var(--blue);
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
 
-    .hero {
-      padding: 30px;
-      margin: 20px 0 22px;
-    }
+        .hero h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.35rem;
+            line-height: 1.1;
+        }
 
-    .eyebrow {
-      display: inline-flex;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: #eff6ff;
-      border: 1px solid rgba(96, 165, 250, 0.16);
-      color: var(--blue-deep);
-      font-size: 0.82rem;
-      font-weight: 700;
-      margin-bottom: 14px;
-    }
+        .subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 1.02rem;
+            line-height: 1.65;
+            max-width: 940px;
+        }
 
-    .title {
-      font-size: clamp(2rem, 4vw, 3rem);
-      line-height: 1.05;
-      font-weight: 800;
-      margin: 0 0 10px 0;
-      letter-spacing: -0.03em;
-    }
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
 
-    .sub {
-      color: var(--muted);
-      line-height: 1.75;
-      margin-bottom: 16px;
-      max-width: 900px;
-    }
+        .badge {
+            background: #e2e8f0;
+            color: var(--text);
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
 
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 22px;
+        }
 
-    .chip {
-      background: #f8fbff;
-      border: 1px solid rgba(96, 165, 250, 0.12);
-      color: #1e3a5f;
-      padding: 9px 13px;
-      border-radius: 999px;
-      font-size: 0.9rem;
-    }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid #dbeafe;
+            border-radius: 16px;
+            padding: 16px;
+        }
 
-    .layout {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: 22px;
-      align-items: start;
-    }
+        .stat-label {
+            display: block;
+            color: #64748b;
+            font-size: 0.86rem;
+            margin-bottom: 8px;
+        }
 
-    .panel { overflow: hidden; }
+        .stat-value {
+            font-size: 1.65rem;
+            font-weight: 800;
+            color: var(--navy);
+        }
 
-    .panel-header {
-      padding: 18px 20px;
-      border-bottom: 1px solid rgba(96, 165, 250, 0.1);
-      background: #f8fbff;
-    }
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 24px;
+        }
 
-    .panel-title {
-      margin: 0;
-      font-size: 1.05rem;
-      font-weight: 800;
-    }
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
 
-    .panel-subtitle {
-      color: var(--muted);
-      font-size: 0.9rem;
-      margin-top: 5px;
-      line-height: 1.6;
-    }
+        .card {
+            background: var(--panel);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid #edf2f7;
+        }
 
-    .panel-body { padding: 20px; }
+        .card h2 {
+            margin: 0 0 18px 0;
+            font-size: 1.35rem;
+            color: var(--navy);
+        }
 
-    .meta-list, .item-list {
-      display: grid;
-      gap: 14px;
-    }
+        .section-intro {
+            margin: -6px 0 18px 0;
+            color: #64748b;
+            line-height: 1.6;
+        }
 
-    .meta-item, .item-card {
-      padding: 16px;
-      border-radius: 16px;
-      background: #f8fbff;
-      border: 1px solid rgba(96, 165, 250, 0.1);
-    }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            row-gap: 12px;
+            column-gap: 16px;
+        }
 
-    .meta-label {
-      color: var(--muted-2);
-      font-size: 0.76rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 6px;
-    }
+        .label {
+            font-weight: bold;
+            color: #334155;
+        }
 
-    .meta-value {
-      font-size: 0.95rem;
-      font-weight: 600;
-      line-height: 1.5;
-      word-break: break-word;
-    }
+        .value {
+            color: #1f2937;
+        }
 
-    .item-title {
-      font-size: 1rem;
-      font-weight: 800;
-      margin-bottom: 8px;
-    }
+        .text-box {
+            background: var(--soft);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 14px;
+            line-height: 1.7;
+        }
 
-    .item-title a {
-      color: var(--blue-deep);
-    }
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
 
-    .item-title a:hover {
-      text-decoration: underline;
-    }
+        .list-item {
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 16px;
+            background: var(--soft);
+        }
 
-    .item-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
+        .list-item h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.05rem;
+        }
 
-    .badge {
-      display: inline-flex;
-      padding: 7px 10px;
-      border-radius: 999px;
-      font-size: 0.82rem;
-      background: #eff6ff;
-      border: 1px solid rgba(96, 165, 250, 0.16);
-      color: var(--blue-deep);
-    }
+        .list-item p {
+            margin: 4px 0;
+            color: var(--muted);
+            line-height: 1.5;
+        }
 
-    .empty {
-      color: var(--muted);
-      font-style: italic;
-    }
+        .list-item a {
+            color: var(--blue);
+            text-decoration: none;
+            font-weight: 700;
+        }
 
-    .main {
-      display: grid;
-      gap: 22px;
-    }
+        .list-item a:hover {
+            text-decoration: underline;
+        }
 
-    @media (max-width: 1100px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tag {
+            background: var(--blue-soft);
+            color: #1e3a8a;
+            padding: 8px 14px;
+            border-radius: 999px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.92rem;
+        }
+
+        .tag:hover {
+            background: #bfdbfe;
+        }
+
+        .breakdown-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .breakdown-box {
+            background: var(--soft);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        .mini-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mini-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: white;
+            border: 1px solid #e5edf7;
+        }
+
+        .mini-label {
+            color: #334155;
+            font-weight: 600;
+        }
+
+        .mini-count {
+            min-width: 34px;
+            text-align: center;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-weight: 700;
+            font-size: 0.86rem;
+        }
+
+        .empty {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        @media (max-width: 980px) {
+            .main-grid,
+            .breakdown-grid,
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <a class="back-link" href="/">← Back to search</a>
+    <div class="navbar">
+        <a href="/">Molecular Search Tool</a>
+        <a href="/">Back to Search</a>
+    </div>
 
-    <section class="hero">
-      <div class="eyebrow">Disease Detail</div>
-      <h1 class="title">{{ disease.disease_name }}</h1>
-      <div class="sub">
-        {{ disease.description or 'No disease description is currently available in the dataset.' }}
-      </div>
-      <div class="chips">
-        <div class="chip">{{ disease.disease_category or 'No category' }}</div>
-        {% if disease.mesh_id %}
-          <div class="chip">MESH: {{ disease.mesh_id }}</div>
-        {% endif %}
-        {% if disease.doid %}
-          <div class="chip">DOID: {{ disease.doid }}</div>
-        {% endif %}
-        {% if disease.ncit_code %}
-          <div class="chip">NCIT: {{ disease.ncit_code }}</div>
-        {% endif %}
-      </div>
-    </section>
+    <div class="page">
+        <div class="hero">
+            <div class="eyebrow">Disease Exploration Hub</div>
+            <h1>{{ disease.disease_name }}</h1>
+            <p class="subtitle">
+                This page treats disease as a context layer that connects targets, binders, and trials, making it easier to keep exploring instead of stopping at a single record.
+            </p>
 
-    <section class="layout">
-      <aside>
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Disease Metadata</h2>
-            <div class="panel-subtitle">Identifiers and descriptive fields for this disease record.</div>
-          </div>
-          <div class="panel-body">
-            <div class="meta-list">
-              <div class="meta-item">
-                <div class="meta-label">Disease Name</div>
-                <div class="meta-value">{{ disease.disease_name }}</div>
-              </div>
-              <div class="meta-item">
-                <div class="meta-label">Category</div>
-                <div class="meta-value">{{ disease.disease_category or 'N/A' }}</div>
-              </div>
-              <div class="meta-item">
-                <div class="meta-label">MESH ID</div>
-                <div class="meta-value">{{ disease.mesh_id or 'N/A' }}</div>
-              </div>
-              <div class="meta-item">
-                <div class="meta-label">DOID</div>
-                <div class="meta-value">{{ disease.doid or 'N/A' }}</div>
-              </div>
-              <div class="meta-item">
-                <div class="meta-label">NCIT Code</div>
-                <div class="meta-value">{{ disease.ncit_code or 'N/A' }}</div>
-              </div>
+            <div class="badge-row">
+                <span class="badge">Category: {{ disease.disease_category or 'Not available' }}</span>
+                <span class="badge">Proteins: {{ proteins|length if proteins else 0 }}</span>
+                <span class="badge">Binders: {{ binders|length if binders else 0 }}</span>
+                <span class="badge">Trials: {{ trials|length if trials else 0 }}</span>
             </div>
-          </div>
-        </div>
-      </aside>
 
-      <main class="main">
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Associated Protein Targets</h2>
-            <div class="panel-subtitle">Protein targets currently linked to this disease in your dataset.</div>
-          </div>
-          <div class="panel-body">
-            {% if proteins %}
-              <div class="item-list">
-                {% for item in proteins %}
-                  <div class="item-card">
-                    <div class="item-title">
-                      <a href="{{ url_for('protein_detail', protein_id=item.protein_id) }}">{{ item.protein_name }}</a>
-                    </div>
-                    <div class="item-badges">
-                      {% if item.gene_symbol %}
-                        <div class="badge">{{ item.gene_symbol }}</div>
-                      {% endif %}
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="empty">No linked proteins found.</div>
-            {% endif %}
-          </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Connected Proteins</span>
+                    <div class="stat-value">{{ proteins|length if proteins else 0 }}</div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Connected Binders</span>
+                    <div class="stat-value">{{ binders|length if binders else 0 }}</div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Connected Trials</span>
+                    <div class="stat-value">{{ trials|length if trials else 0 }}</div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Nearby Diseases</span>
+                    <div class="stat-value">{{ related_diseases|length if related_diseases else 0 }}</div>
+                </div>
+            </div>
         </div>
 
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Associated Therapeutic Binders</h2>
-            <div class="panel-subtitle">Therapeutics linked through proteins currently connected to this disease.</div>
-          </div>
-          <div class="panel-body">
-            {% if binders %}
-              <div class="item-list">
-                {% for item in binders %}
-                  <div class="item-card">
-                    <div class="item-title">
-                      <a href="{{ url_for('binder_detail', binder_id=item.binder_id) }}">{{ item.binder_name }}</a>
+        <div class="main-grid">
+            <div class="stack">
+                <div class="card">
+                    <h2>Disease Overview</h2>
+                    <div class="info-grid">
+                        <div class="label">Disease Name</div>
+                        <div class="value">{{ disease.disease_name or 'Not available' }}</div>
+
+                        <div class="label">Disease Category</div>
+                        <div class="value">{{ disease.disease_category or 'Not available' }}</div>
+
+                        <div class="label">MeSH ID</div>
+                        <div class="value">{{ disease.mesh_id or 'Not available' }}</div>
+
+                        <div class="label">DOID</div>
+                        <div class="value">{{ disease.doid or 'Not available' }}</div>
+
+                        <div class="label">NCIt Code</div>
+                        <div class="value">{{ disease.ncit_code or 'Not available' }}</div>
                     </div>
-                    <div class="item-badges">
-                      {% if item.modality_name %}
-                        <div class="badge">{{ item.modality_name }}</div>
-                      {% endif %}
-                      <div class="badge">{{ item.approval_status or 'No approval status' }}</div>
-                    </div>
-                    {% if item.mechanism_of_action %}
-                      <div class="panel-subtitle">{{ item.mechanism_of_action }}</div>
+                </div>
+
+                <div class="card">
+                    <h2>Description</h2>
+                    {% if disease.description %}
+                        <div class="text-box">{{ disease.description }}</div>
+                    {% else %}
+                        <p class="empty">No disease description is currently available.</p>
                     {% endif %}
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="empty">No linked therapeutic binders found.</div>
-            {% endif %}
-          </div>
-        </div>
+                </div>
 
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Associated Clinical Trials</h2>
-            <div class="panel-subtitle">Clinical studies currently connected to this disease record.</div>
-          </div>
-          <div class="panel-body">
-            {% if trials %}
-              <div class="item-list">
-                {% for item in trials %}
-                  <div class="item-card">
-                    <div class="item-title">
-                      <a href="{{ url_for('trial_detail', trial_id=item.trial_id) }}">{{ item.trial_title }}</a>
+                <div class="card">
+                    <h2>Connected Binders</h2>
+                    <p class="section-intro">
+                        These are the therapeutic objects most useful for continuing exploration from the disease context.
+                    </p>
+                    {% if binders and binders|length > 0 %}
+                        <div class="list">
+                            {% for binder in binders %}
+                                <div class="list-item">
+                                    <h3><a href="/binder/{{ binder.binder_id }}">{{ binder.binder_name }}</a></h3>
+                                    <p><strong>Binder Type:</strong> {{ binder.binder_type or 'Not available' }}</p>
+                                    <p><strong>Clinical Status:</strong> {{ binder.clinical_status or binder.approval_status or 'Not available' }}</p>
+                                    <p><strong>Modality:</strong> {{ binder.modality_name or 'Not available' }}</p>
+                                    <p><strong>Mechanism:</strong> {{ binder.mechanism_of_action or 'Not available' }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No connected binders were found for this disease.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Connected Protein Targets</h2>
+                    {% if proteins and proteins|length > 0 %}
+                        <div class="list">
+                            {% for protein in proteins %}
+                                <div class="list-item">
+                                    <h3><a href="/protein/{{ protein.protein_id }}">{{ protein.gene_symbol or protein.protein_name }}</a></h3>
+                                    <p><strong>Protein Name:</strong> {{ protein.protein_name or 'Not available' }}</p>
+                                    <p><strong>Gene Name:</strong> {{ protein.gene_name or 'Not available' }}</p>
+                                    <p><strong>UniProt:</strong> {{ protein.uniprot_accession or 'Not available' }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No connected proteins were found for this disease.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="stack">
+                <div class="card">
+                    <h2>Exploration Breakdowns</h2>
+                    <div class="breakdown-grid">
+                        <div class="breakdown-box">
+                            <h3 style="margin-top:0;">Binders by Type</h3>
+                            {% if binder_type_breakdown %}
+                                <div class="mini-list">
+                                    {% for item in binder_type_breakdown %}
+                                        <div class="mini-row">
+                                            <span class="mini-label">{{ item.label }}</span>
+                                            <span class="mini-count">{{ item.count }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="empty">No binder type breakdown available.</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="breakdown-box">
+                            <h3 style="margin-top:0;">Top Connected Targets</h3>
+                            {% if protein_gene_breakdown %}
+                                <div class="mini-list">
+                                    {% for item in protein_gene_breakdown %}
+                                        <div class="mini-row">
+                                            <span class="mini-label">{{ item.label }}</span>
+                                            <span class="mini-count">{{ item.count }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="empty">No connected target breakdown available.</p>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="item-badges">
-                      <div class="badge">{{ item.nct_id or 'No NCT ID' }}</div>
-                      <div class="badge">{{ item.phase or 'No phase' }}</div>
-                      <div class="badge">{{ item.recruitment_status or 'No status' }}</div>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="empty">No linked clinical trials found.</div>
-            {% endif %}
-          </div>
+                </div>
+
+                <div class="card">
+                    <h2>Clinical Trials in This Disease Context</h2>
+                    {% if trials and trials|length > 0 %}
+                        <div class="list">
+                            {% for trial in trials %}
+                                <div class="list-item">
+                                    <h3><a href="/trial/{{ trial.trial_id }}">{{ trial.nct_id or trial.trial_title }}</a></h3>
+                                    <p><strong>Trial Title:</strong> {{ trial.trial_title or 'Not available' }}</p>
+                                    <p><strong>Condition:</strong> {{ trial.condition_name or 'Not available' }}</p>
+                                    <p><strong>Phase:</strong> {{ trial.phase or 'Not available' }}</p>
+                                    <p><strong>Recruitment Status:</strong> {{ trial.recruitment_status or 'Not available' }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No clinical trials were linked to this disease.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Related Diseases</h2>
+                    <p class="section-intro">
+                        These diseases share proteins, binders, or trials with the current disease context.
+                    </p>
+                    {% if related_diseases and related_diseases|length > 0 %}
+                        <div class="tag-list">
+                            {% for item in related_diseases %}
+                                <a class="tag" href="/disease/{{ item.disease_id }}">{{ item.disease_name }}</a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No related diseases are currently available.</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-      </main>
-    </section>
-  </div>
+    </div>
 </body>
 </html>
