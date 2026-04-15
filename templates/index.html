@@ -631,7 +631,7 @@
           <div class="hero-grid">
             <div class="hero-left">
               <div class="eyebrow">Search Routing + Binder-First Exploration</div>
-              <h1>Search across <span class="accent">targets, binders, trials,</span> and disease context</h1>
+              <h1>Search across <span class="accent">targets, binders, trials,</span> and disease tags</h1>
               <p>
                 Exact target-style queries can go directly to a protein page, binder-style queries stay in a binder-first results flow,
                 and disease-style queries become filtered exploration views.
@@ -645,11 +645,11 @@
             <div class="hero-right">
               <div class="mini-panel">
                 <h3>Recommended searches</h3>
-                <p>Try target names, binder names, disease terms, or clinical trial IDs to test the new routing behavior.</p>
+                <p>Try target names, binder names, disease tags, or clinical trial IDs to test the routing and binder classification behavior.</p>
               </div>
               <div class="mini-panel">
                 <h3>Binder-first by default</h3>
-                <p>Unless the search is an exact direct match for a specific page, the platform now keeps binders prominent in the results flow.</p>
+                <p>Unless the search is an exact direct match for a specific page, the platform keeps binders prominent and treats disease as a contextual tag layer.</p>
               </div>
             </div>
           </div>
@@ -667,7 +667,7 @@
                   name="q"
                   type="text"
                   value="{{ query or '' }}"
-                  placeholder="Try EGFR, EGFR binders, lung cancer, Cetuximab, or an NCT ID"
+                  placeholder="Try EGFR, EGFR binders, lung cancer, Cetuximab, a FASTA sequence, or an NCT ID"
                 />
               </div>
 
@@ -692,15 +692,52 @@
               </div>
 
               <div class="field">
-                <label for="disease_name">Disease Filter</label>
+                <label for="disease_name">Disease Tag</label>
                 <select id="disease_name" name="disease_name">
-                  <option value="">All diseases</option>
+                  <option value="">All disease tags</option>
                   {% for item in filter_options.diseases %}
                     <option value="{{ item }}" {% if selected_disease_name == item %}selected{% endif %}>{{ item }}</option>
                   {% endfor %}
                 </select>
               </div>
 
+              <div class="field">
+                <label for="binder_sort">Binder Sort</label>
+                <select id="binder_sort" name="binder_sort">
+                  <option value="relevance" {% if selected_binder_sort == 'relevance' %}selected{% endif %}>Relevance</option>
+                  <option value="name_asc" {% if selected_binder_sort == 'name_asc' %}selected{% endif %}>Name A-Z</option>
+                  <option value="name_desc" {% if selected_binder_sort == 'name_desc' %}selected{% endif %}>Name Z-A</option>
+                  <option value="binder_type" {% if selected_binder_sort == 'binder_type' %}selected{% endif %}>Binder type</option>
+                  <option value="clinical_status" {% if selected_binder_sort == 'clinical_status' %}selected{% endif %}>Clinical status</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="protein_sort">Protein Sort</label>
+                <select id="protein_sort" name="protein_sort">
+                  <option value="relevance" {% if selected_protein_sort == 'relevance' %}selected{% endif %}>Relevance</option>
+                  <option value="gene_symbol" {% if selected_protein_sort == 'gene_symbol' %}selected{% endif %}>Gene symbol</option>
+                  <option value="protein_name" {% if selected_protein_sort == 'protein_name' %}selected{% endif %}>Protein name</option>
+                  <option value="uniprot_accession" {% if selected_protein_sort == 'uniprot_accession' %}selected{% endif %}>UniProt</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="trial_sort">Trial Sort</label>
+                <select id="trial_sort" name="trial_sort">
+                  <option value="relevance" {% if selected_trial_sort == 'relevance' %}selected{% endif %}>Relevance</option>
+                  <option value="nct_id" {% if selected_trial_sort == 'nct_id' %}selected{% endif %}>NCT ID</option>
+                  <option value="phase" {% if selected_trial_sort == 'phase' %}selected{% endif %}>Phase</option>
+                  <option value="recruitment_status" {% if selected_trial_sort == 'recruitment_status' %}selected{% endif %}>Recruitment</option>
+                  <option value="title" {% if selected_trial_sort == 'title' %}selected{% endif %}>Title</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="disease_sort">Disease Sort</label>
+                <select id="disease_sort" name="disease_sort">
+                  <option value="relevance" {% if selected_disease_sort == 'relevance' %}selected{% endif %}>Relevance</option>
+                  <option value="disease_name" {% if selected_disease_sort == 'disease_name' %}selected{% endif %}>Disease name</option>
+                  <option value="disease_category" {% if selected_disease_sort == 'disease_category' %}selected{% endif %}>Category</option>
+                </select>
+              </div>
               <div class="actions">
                 <button class="btn btn-primary" type="submit">Search</button>
                 <a class="btn btn-secondary" href="/">Clear</a>
@@ -714,6 +751,27 @@
               <a class="quick-link" href="/?q=HER2">HER2</a>
               <a class="quick-link" href="/?q=Cetuximab">Cetuximab</a>
             </div>
+            <div class="route-note" style="margin-top:14px;color:var(--muted);font-size:0.92rem;line-height:1.6;">
+              Binder classification is centered on the sponsor MVP classes <strong>IgG</strong>, <strong>VHH</strong>, and <strong>Peptide</strong>.
+              Disease is treated as a contextual tag layer for filtering and exploration rather than the top-level pillar.
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="search-shell">
+        <div class="search-panel">
+          <form class="search-form" method="POST" action="/" enctype="multipart/form-data">
+            <div class="search-row">
+              <div class="field">
+                <label for="structure_file">Structure Similarity Search</label>
+                <input id="structure_file" name="structure_file" type="file" accept=".pdb,.cif,.mmcif" />
+              </div>
+              <div class="actions">
+                <button class="btn btn-primary" type="submit">Compare Structure</button>
+              </div>
+            </div>
+            <div class="route-note" style="margin-top:14px;color:var(--muted);font-size:0.92rem;line-height:1.6;">Upload a <strong>.pdb</strong>, <strong>.cif</strong>, or <strong>.mmcif</strong> file to run the beta MVP structural similarity workflow.</div>
           </form>
         </div>
       </section>
@@ -741,11 +799,13 @@
         {% if results %}
           <div class="result-meta">
             <div class="meta-pill">Original query: {{ query }}</div>
+            <div class="meta-pill">Binder classes: IgG / VHH / Peptide</div>
             {% if effective_query and effective_query != query %}
               <div class="meta-pill">Search term used for matching: {{ effective_query }}</div>
             {% endif %}
             <div class="meta-pill">Intent: {{ results.intent }}</div>
             <div class="meta-pill">Primary section: {{ results.primary_section }}</div>
+            <div class="meta-pill">Sorts: B={{ selected_binder_sort }}, P={{ selected_protein_sort }}, T={{ selected_trial_sort }}, D={{ selected_disease_sort }}</div>
           </div>
 
           <div class="section-grid">
@@ -765,8 +825,8 @@
                 {% set subtitle = 'Validation and translational evidence layer' %}
                 {% set icon = 'T' %}
               {% else %}
-                {% set title = 'Disease Context' %}
-                {% set subtitle = 'Disease tags and contextual disease records' %}
+                {% set title = 'Disease Tags' %}
+                {% set subtitle = 'Contextual disease tags used for filtering and navigation' %}
                 {% set icon = 'D' %}
               {% endif %}
 
@@ -794,9 +854,12 @@
                         <div class="card">
                           <h3><a href="/binder/{{ item.binder_id }}">{{ item.binder_name }}</a></h3>
                           <p><span class="label">Binder Type:</span> {{ item.binder_type or 'Not available' }}</p>
+                          <p><span class="label">Classification Family:</span> {{ item.binder_class_family or 'Not available' }}</p>
                           <p><span class="label">Clinical Status:</span> {{ item.clinical_status or item.approval_status or 'Not available' }}</p>
                           <p><span class="label">Modality:</span> {{ item.modality_name or 'Not available' }}</p>
                           <p><span class="label">Mechanism:</span> {{ item.mechanism_of_action or 'Not available' }}</p>
+                          {% if item.sequence_similarity_percent %}<p><span class="label">Sequence Similarity:</span> {{ item.sequence_similarity_percent }}%</p>{% endif %}
+                          {% if item.matched_sequence_preview %}<p><span class="label">Matched Sequence:</span> {{ item.matched_sequence_preview }}</p>{% endif %}
                           <div class="card-tags">
                             <span class="card-tag">Binder-first result</span>
                             {% if item.sequence %}
@@ -813,6 +876,7 @@
                           <p><span class="label">Gene:</span> {{ item.gene_name or item.gene_symbol or 'Not available' }}</p>
                           <p><span class="label">UniProt:</span> {{ item.uniprot_accession or 'Not available' }}</p>
                           <p><span class="label">Organism:</span> {{ item.organism_name or 'Not available' }}</p>
+                          {% if item.best_sequence_similarity_percent %}<p><span class="label">Best Linked Sequence Similarity:</span> {{ item.best_sequence_similarity_percent }}%</p>{% endif %}
                         </div>
                       {% endfor %}
                     {% elif section_name == 'trials' %}
@@ -823,16 +887,18 @@
                           <p><span class="label">Condition:</span> {{ item.condition_name or 'Not available' }}</p>
                           <p><span class="label">Phase:</span> {{ item.phase or 'Not available' }}</p>
                           <p><span class="label">Recruitment:</span> {{ item.recruitment_status or 'Not available' }}</p>
+                          {% if item.best_sequence_similarity_percent %}<p><span class="label">Best Linked Sequence Similarity:</span> {{ item.best_sequence_similarity_percent }}%</p>{% endif %}
                         </div>
                       {% endfor %}
                     {% else %}
                       {% for item in items %}
                         <div class="card">
                           <h3><a href="/disease/{{ item.disease_id }}">{{ item.disease_name }}</a></h3>
-                          <p><span class="label">Category:</span> {{ item.disease_category or 'Not available' }}</p>
+                          <p><span class="label">Disease Tag Category:</span> {{ item.disease_category or 'Not available' }}</p>
                           <p><span class="label">Description:</span> {{ item.description or 'Not available' }}</p>
+                          {% if item.best_sequence_similarity_percent %}<p><span class="label">Best Linked Sequence Similarity:</span> {{ item.best_sequence_similarity_percent }}%</p>{% endif %}
                           <div class="card-tags">
-                            <span class="card-tag">Disease context</span>
+                            <span class="card-tag">Disease tag</span>
                           </div>
                         </div>
                       {% endfor %}
@@ -849,6 +915,32 @@
         {% elif query %}
           <div class="message message-info">
             The search completed, but no records were returned.
+          </div>
+        {% endif %}
+        {% if structure_error %}
+          <div class="message message-error"><strong>Structure search error:</strong> {{ structure_error }}</div>
+        {% endif %}
+        {% if structure_results %}
+          <div class="summary-card"><div class="summary-title">Structure Similarity Summary</div><div class="summary-text">{{ structure_results.summary }}</div></div>
+          <div class="result-meta">
+            <div class="meta-pill">Uploaded file: {{ structure_results.query_filename }}</div>
+            <div class="meta-pill">Compared matches: {{ structure_results.matches|length }}</div>
+            {% if structure_results.failure_count %}<div class="meta-pill">Skipped candidates: {{ structure_results.failure_count }}</div>{% endif %}
+          </div>
+          <div class="result-section primary">
+            <div class="section-head">
+              <div class="section-title-wrap"><div class="section-icon">S</div><div><div class="section-title">Structure Similarity Matches · Primary</div><div class="section-subtitle">Uploaded structure compared against linked structures in the current dataset</div></div></div>
+              <div class="section-count">{{ structure_results.matches|length }} result{% if structure_results.matches|length != 1 %}s{% endif %}</div>
+            </div>
+            {% if structure_results.matches %}<div class="cards">{% for item in structure_results.matches %}<div class="card">
+              <h3>{% if item.external_url %}<a href="{{ item.external_url }}" target="_blank" rel="noopener">{{ item.pdb_id or item.structure_title }}</a>{% else %}{{ item.pdb_id or item.structure_title }}{% endif %}</h3>
+              <p><span class="label">Similarity Score:</span> {{ item.similarity_score }}%</p>
+              <p><span class="label">Structure Title:</span> {{ item.structure_title or 'Not available' }}</p>
+              <p><span class="label">Target:</span> {% if item.protein_id %}<a href="/protein/{{ item.protein_id }}">{{ item.gene_symbol or item.protein_name }}</a>{% else %}{{ item.gene_symbol or item.protein_name or 'Not available' }}{% endif %}</p>
+              <p><span class="label">Method:</span> {{ item.experimental_method or 'Not available' }}</p>
+              <p><span class="label">Resolution:</span> {{ item.resolution or 'Not available' }}</p>
+              <div class="card-tags">{% if item.viewer_url %}<a class="card-tag" href="{{ item.viewer_url }}" target="_blank" rel="noopener">Open viewer</a>{% endif %}{% if item.pdb_id %}<span class="card-tag">PDB {{ item.pdb_id }}</span>{% endif %}</div>
+            </div>{% endfor %}</div>{% else %}<div class="empty-state">No comparable structures were found in the current dataset.</div>{% endif %}
           </div>
         {% endif %}
       </section>

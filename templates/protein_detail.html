@@ -454,7 +454,7 @@
                 </div>
 
                 <div class="card">
-                    <h2>Associated Diseases</h2>
+                    <h2>Associated Disease Tags</h2>
                     {% if diseases and diseases|length > 0 %}
                         <div class="tag-list">
                             {% for disease in diseases %}
@@ -462,7 +462,7 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <p class="empty">No associated disease tags found.</p>
+                        <p class="empty">No associated disease tags found for this target.</p>
                     {% endif %}
                 </div>
 

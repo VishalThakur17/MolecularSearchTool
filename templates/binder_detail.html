@@ -503,6 +503,7 @@
 
             <div class="badge-row">
                 <span class="badge">Binder Type: {{ binder.binder_type or 'Not available' }}</span>
+                <span class="badge">Classification Family: {{ binder_classification.class_family or 'Not available' }}</span>
                 <span class="badge">Clinical Status: {{ binder.clinical_status or binder.approval_status or 'Not available' }}</span>
                 <span class="badge">Modality: {{ binder.modality_name or 'Not available' }}</span>
                 <span class="badge">Sequence Length: {{ sequence_length if sequence_length else 'Not available' }}</span>
@@ -691,9 +692,9 @@
                 </div>
 
                 <div class="card">
-                    <h2>Current Disease Context</h2>
+                    <h2>Current Disease Tag Context</h2>
                     <p class="section-intro">
-                        Diseases are shown as associated tags and context, not as the top-level organizing structure.
+                        Diseases are shown as associated tags and context, not as the top-level organizing structure. Binder classification is centered on the sponsor MVP classes of IgG, VHH, and Peptide.
                     </p>
                     {% if diseases and diseases|length > 0 %}
                         <div class="tag-list">
@@ -702,7 +703,7 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <p class="empty">No disease tags are currently linked to this binder.</p>
+                        <p class="empty">No disease tags are currently linked to this binder yet.</p>
                     {% endif %}
                 </div>
 

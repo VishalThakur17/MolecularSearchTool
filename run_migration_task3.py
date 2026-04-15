@@ -40,4 +40,4 @@ with get_connection() as conn:
         cur.execute(sql)
     conn.commit()
 
-print("✅ Priority 3 migration completed successfully")
+print("Priority 3 migration completed successfully")

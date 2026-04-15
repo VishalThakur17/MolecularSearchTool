@@ -9,18 +9,34 @@
       --bg: #f7fbff;
       --bg-2: #eef7ff;
       --panel: rgba(255, 255, 255, 0.96);
+      --panel-solid: #ffffff;
+      --panel-2: #f8fcff;
       --line: rgba(96, 165, 250, 0.14);
+      --line-strong: rgba(96, 165, 250, 0.26);
       --text: #0f172a;
       --muted: #516277;
+      --muted-2: #6f85a0;
       --blue: #60a5fa;
       --blue-soft: #dbeafe;
+      --blue-soft-2: #eaf4ff;
       --blue-deep: #2563eb;
+      --cyan-soft: #f0f9ff;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
       --shadow: 0 16px 44px rgba(96, 165, 250, 0.14);
+      --radius: 22px;
+      --radius-sm: 14px;
       --max: 1380px;
     }
 
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
 
     body {
       margin: 0;
@@ -553,44 +569,6 @@
       border: 1px solid rgba(56, 189, 248, 0.12);
     }
 
-    .explore-block {
-      margin-top: 14px;
-      padding-top: 14px;
-      border-top: 1px solid rgba(96, 165, 250, 0.12);
-    }
-
-    .explore-title {
-      font-size: 0.82rem;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--blue-deep);
-      margin-bottom: 10px;
-    }
-
-    .explore-links {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .explore-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: #eff6ff;
-      color: #1d4ed8;
-      font-size: 0.84rem;
-      font-weight: 700;
-      border: 1px solid rgba(96, 165, 250, 0.16);
-    }
-
-    .explore-link:hover {
-      background: #dbeafe;
-    }
-
     .empty-state {
       padding: 18px 24px 26px;
       color: var(--muted);
@@ -627,6 +605,128 @@
         align-items: flex-start;
       }
     }
+  
+    .dual-tools {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .tool-panel {
+      background: rgba(255,255,255,0.82);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .tool-panel h3 {
+      margin: 0 0 8px 0;
+      font-size: 1rem;
+    }
+
+    .tool-panel p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.93rem;
+    }
+
+    .upload-row {
+      display: flex;
+      gap: 12px;
+      align-items: end;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .upload-row input[type="file"] {
+      flex: 1 1 280px;
+      min-height: 46px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px dashed rgba(96, 165, 250, 0.3);
+      background: #fff;
+    }
+
+    .signature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .signature-card {
+      background: #fff;
+      border: 1px solid rgba(96, 165, 250, 0.12);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .signature-label {
+      font-size: 0.8rem;
+      color: var(--muted-2);
+      margin-bottom: 6px;
+    }
+
+    .signature-value {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .structure-match-list {
+      display: grid;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .structure-match {
+      background: var(--panel);
+      border: 1px solid rgba(96, 165, 250, 0.14);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 12px 28px rgba(96, 165, 250, 0.08);
+    }
+
+    .match-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+      flex-wrap: wrap;
+    }
+
+    .score-badge {
+      display: inline-flex;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: var(--blue-deep);
+      font-weight: 700;
+      border: 1px solid rgba(96, 165, 250, 0.18);
+    }
+
+    .match-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .tiny-note {
+      color: var(--muted-2);
+      font-size: 0.84rem;
+      line-height: 1.6;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 980px) {
+      .dual-tools {
+        grid-template-columns: 1fr;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -652,27 +752,26 @@
         <div class="hero-panel">
           <div class="hero-grid">
             <div class="hero-left">
-              <div class="eyebrow">Connected Search Exploration</div>
+              <div class="eyebrow">Search Routing + Binder-First Exploration</div>
               <h1>Search across <span class="accent">targets, binders, trials,</span> and disease context</h1>
               <p>
                 Exact target-style queries can go directly to a protein page, binder-style queries stay in a binder-first results flow,
-                and each result card now includes quick exploration links so users can keep moving through connected biology and therapeutic context.
+                and disease-style queries become filtered exploration views.
               </p>
               <div class="hero-badges">
                 <div class="hero-badge">EGFR → target page</div>
                 <div class="hero-badge">EGFR binders → binder results</div>
                 <div class="hero-badge">lung cancer → disease-tag filtered results</div>
-                <div class="hero-badge">Every card → next-step links</div>
               </div>
             </div>
             <div class="hero-right">
               <div class="mini-panel">
                 <h3>Recommended searches</h3>
-                <p>Try target names, binder names, disease terms, or clinical trial IDs to test the routing and connected exploration behavior.</p>
+                <p>Try target names, binder names, disease terms, or clinical trial IDs to test the new routing behavior.</p>
               </div>
               <div class="mini-panel">
-                <h3>Exploration-first flow</h3>
-                <p>Search results are no longer just static cards. Each card now suggests meaningful next steps into binders, proteins, diseases, and trials.</p>
+                <h3>Binder-first by default</h3>
+                <p>Unless the search is an exact direct match for a specific page, the platform now keeps binders prominent in the results flow.</p>
               </div>
             </div>
           </div>
@@ -738,6 +837,24 @@
               <a class="quick-link" href="/?q=Cetuximab">Cetuximab</a>
             </div>
           </form>
+          <div class="dual-tools">
+            <div class="tool-panel">
+              <h3>Sequence Similarity (Current MVP)</h3>
+              <p>Paste a FASTA or amino-acid sequence into the main search bar above. Sequence-like input is automatically detected and routed through the sequence-style search behavior.</p>
+            </div>
+            <div class="tool-panel">
+              <h3>Structure Similarity Search</h3>
+              <p>Upload a PDB or mmCIF structure file to compare it against linked structures already stored in the platform.</p>
+              <form method="POST" action="/structure-similarity" enctype="multipart/form-data">
+                <div class="upload-row">
+                  <input type="file" name="structure_file" accept=".pdb,.cif,.mmcif" required />
+                  <button class="btn btn-primary" type="submit">Compare Structure</button>
+                </div>
+              </form>
+              <div class="tiny-note">This beta MVP uses a structural signature based on atom count, residue count, chain count, spatial span, and radius of gyration. It does not use Foldseek or TM-score yet.</div>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -758,6 +875,100 @@
           <div class="summary-card">
             <div class="summary-title">Result Summary</div>
             <div class="summary-text">{{ summary }}</div>
+          </div>
+        {% endif %}
+
+        {% if structure_error %}
+          <div class="message message-error">
+            <strong>Structure similarity error:</strong> {{ structure_error }}
+          </div>
+        {% endif %}
+
+        {% if structure_similarity %}
+          <div class="summary-card">
+            <div class="summary-title">Structure Similarity Summary</div>
+            <div class="summary-text">{{ structure_similarity.summary }}</div>
+          </div>
+
+          <div class="result-meta">
+            <div class="meta-pill">Uploaded file: {{ structure_similarity.query_filename }}</div>
+            <div class="meta-pill">Matches scored: {{ structure_similarity.matches|length }}</div>
+            <div class="meta-pill">Candidate fetch failures: {{ structure_similarity.failure_count }}</div>
+          </div>
+
+          <div class="result-section primary" style="margin-bottom: 22px;">
+            <div class="section-head">
+              <div class="section-title-wrap">
+                <div class="section-icon">S</div>
+                <div>
+                  <div class="section-title">Uploaded Structure Signature</div>
+                  <div class="section-subtitle">Compact metadata extracted from the uploaded 3D structure file</div>
+                </div>
+              </div>
+            </div>
+            <div class="signature-grid">
+              {% for key, value in structure_similarity.query_signature.items() %}
+                <div class="signature-card">
+                  <div class="signature-label">{{ key.replace('_', ' ')|title }}</div>
+                  <div class="signature-value">{{ value }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="result-section primary">
+            <div class="section-head">
+              <div class="section-title-wrap">
+                <div class="section-icon">M</div>
+                <div>
+                  <div class="section-title">Top Structure Matches</div>
+                  <div class="section-subtitle">Ranked against linked PDB entries in your current dataset</div>
+                </div>
+              </div>
+              <div class="section-count">{{ structure_similarity.matches|length }} result{% if structure_similarity.matches|length != 1 %}s{% endif %}</div>
+            </div>
+
+            {% if structure_similarity.matches %}
+              <div class="structure-match-list">
+                {% for item in structure_similarity.matches %}
+                  <div class="structure-match">
+                    <div class="match-head">
+                      <div>
+                        <h3 style="margin:0 0 8px 0;">{{ item.pdb_id or 'Linked Structure' }} · {{ item.structure_title or 'Untitled structure' }}</h3>
+                        <p style="margin:0;"><span class="label">Protein:</span>
+                          {% if item.protein_id %}
+                            <a href="/protein/{{ item.protein_id }}">{{ item.gene_symbol or item.protein_name or 'Linked protein' }}</a>
+                          {% else %}
+                            {{ item.gene_symbol or item.protein_name or 'Not linked' }}
+                          {% endif %}
+                        </p>
+                        <p><span class="label">Method:</span> {{ item.experimental_method or 'Not available' }}</p>
+                        <p><span class="label">Resolution:</span> {{ item.resolution or 'Not available' }}</p>
+                      </div>
+                      <div class="score-badge">Similarity {{ item.similarity_score }}%</div>
+                    </div>
+
+                    <div class="signature-grid">
+                      <div class="signature-card"><div class="signature-label">Atoms</div><div class="signature-value">{{ item.candidate_signature.atom_count }}</div></div>
+                      <div class="signature-card"><div class="signature-label">Residues</div><div class="signature-value">{{ item.candidate_signature.residue_count }}</div></div>
+                      <div class="signature-card"><div class="signature-label">Chains</div><div class="signature-value">{{ item.candidate_signature.chain_count }}</div></div>
+                      <div class="signature-card"><div class="signature-label">Radius of Gyration</div><div class="signature-value">{{ item.candidate_signature.radius_gyration }}</div></div>
+                    </div>
+
+                    <div class="match-actions">
+                      {% if item.viewer_url %}<a class="btn btn-secondary" target="_blank" href="{{ item.viewer_url }}">Open Viewer</a>{% endif %}
+                      {% if item.external_url %}<a class="btn btn-secondary" target="_blank" href="{{ item.external_url }}">RCSB Page</a>{% endif %}
+                    </div>
+
+                    <div class="tiny-note">
+                      Distance breakdown — atom: {{ item.score_breakdown.atom_diff }}, residue: {{ item.score_breakdown.residue_diff }}, chains: {{ item.score_breakdown.chain_diff }}, radius: {{ item.score_breakdown.rg_diff }}, span: {{ item.score_breakdown.span_diff }}, compactness: {{ item.score_breakdown.compactness_diff }}.
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty-state">No linked structures were comparable to the uploaded file.</div>
+            {% endif %}
           </div>
         {% endif %}
 
@@ -820,43 +1031,11 @@
                           <p><span class="label">Clinical Status:</span> {{ item.clinical_status or item.approval_status or 'Not available' }}</p>
                           <p><span class="label">Modality:</span> {{ item.modality_name or 'Not available' }}</p>
                           <p><span class="label">Mechanism:</span> {{ item.mechanism_of_action or 'Not available' }}</p>
-
-                          {% if item.linked_targets_preview %}
-                            <p><span class="label">Targets:</span>
-                              {% for target in item.linked_targets_preview %}
-                                {{ target.label }}{% if not loop.last %}, {% endif %}
-                              {% endfor %}
-                              {% if item.linked_target_count > item.linked_targets_preview|length %}
-                                +{{ item.linked_target_count - item.linked_targets_preview|length }} more
-                              {% endif %}
-                            </p>
-                          {% endif %}
-
                           <div class="card-tags">
                             <span class="card-tag">Binder-first result</span>
                             {% if item.sequence %}
                               <span class="card-tag">Sequence available</span>
                             {% endif %}
-                            {% if item.linked_target_count %}
-                              <span class="card-tag">{{ item.linked_target_count }} linked target{% if item.linked_target_count != 1 %}s{% endif %}</span>
-                            {% endif %}
-                          </div>
-
-                          <div class="explore-block">
-                            <div class="explore-title">Keep Exploring</div>
-                            <div class="explore-links">
-                              <a class="explore-link" href="/binder/{{ item.binder_id }}">Open binder page</a>
-
-                              {% if item.linked_targets_preview %}
-                                <a class="explore-link" href="/protein/{{ item.linked_targets_preview[0].protein_id }}">Open top target</a>
-                              {% endif %}
-
-                              <a class="explore-link" href="/?q={{ item.binder_name | urlencode }}+trials">Find linked trials</a>
-
-                              {% if item.linked_diseases_preview %}
-                                <a class="explore-link" href="/?q={{ item.linked_diseases_preview[0] | urlencode }}">Explore disease context</a>
-                              {% endif %}
-                            </div>
                           </div>
                         </div>
                       {% endfor %}
@@ -868,24 +1047,6 @@
                           <p><span class="label">Gene:</span> {{ item.gene_name or item.gene_symbol or 'Not available' }}</p>
                           <p><span class="label">UniProt:</span> {{ item.uniprot_accession or 'Not available' }}</p>
                           <p><span class="label">Organism:</span> {{ item.organism_name or 'Not available' }}</p>
-
-                          <div class="card-tags">
-                            {% if item.linked_binder_count %}
-                              <span class="card-tag">{{ item.linked_binder_count }} linked binder{% if item.linked_binder_count != 1 %}s{% endif %}</span>
-                            {% endif %}
-                            {% if item.linked_trial_count %}
-                              <span class="card-tag">{{ item.linked_trial_count }} linked trial{% if item.linked_trial_count != 1 %}s{% endif %}</span>
-                            {% endif %}
-                          </div>
-
-                          <div class="explore-block">
-                            <div class="explore-title">Keep Exploring</div>
-                            <div class="explore-links">
-                              <a class="explore-link" href="/protein/{{ item.protein_id }}">Open protein page</a>
-                              <a class="explore-link" href="/?q={{ (item.gene_symbol or item.protein_name) | urlencode }}+binders">Find binders</a>
-                              <a class="explore-link" href="/?q={{ (item.gene_symbol or item.protein_name) | urlencode }}+trials">Find trials</a>
-                            </div>
-                          </div>
                         </div>
                       {% endfor %}
                     {% elif section_name == 'trials' %}
@@ -896,31 +1057,6 @@
                           <p><span class="label">Condition:</span> {{ item.condition_name or 'Not available' }}</p>
                           <p><span class="label">Phase:</span> {{ item.phase or 'Not available' }}</p>
                           <p><span class="label">Recruitment:</span> {{ item.recruitment_status or 'Not available' }}</p>
-
-                          {% if item.linked_diseases_preview %}
-                            <p><span class="label">Disease Context:</span>
-                              {% for disease_name in item.linked_diseases_preview %}
-                                {{ disease_name }}{% if not loop.last %}, {% endif %}
-                              {% endfor %}
-                            </p>
-                          {% endif %}
-
-                          <div class="card-tags">
-                            {% if item.linked_binder_count %}
-                              <span class="card-tag">{{ item.linked_binder_count }} linked binder{% if item.linked_binder_count != 1 %}s{% endif %}</span>
-                            {% endif %}
-                          </div>
-
-                          <div class="explore-block">
-                            <div class="explore-title">Keep Exploring</div>
-                            <div class="explore-links">
-                              <a class="explore-link" href="/trial/{{ item.trial_id }}">Open trial page</a>
-                              <a class="explore-link" href="/?q={{ (item.nct_id or item.trial_title) | urlencode }}+binders">Find linked binders</a>
-                              {% if item.linked_diseases_preview %}
-                                <a class="explore-link" href="/?q={{ item.linked_diseases_preview[0] | urlencode }}">Explore disease context</a>
-                              {% endif %}
-                            </div>
-                          </div>
                         </div>
                       {% endfor %}
                     {% else %}
@@ -929,24 +1065,8 @@
                           <h3><a href="/disease/{{ item.disease_id }}">{{ item.disease_name }}</a></h3>
                           <p><span class="label">Category:</span> {{ item.disease_category or 'Not available' }}</p>
                           <p><span class="label">Description:</span> {{ item.description or 'Not available' }}</p>
-
                           <div class="card-tags">
                             <span class="card-tag">Disease context</span>
-                            {% if item.linked_binder_count %}
-                              <span class="card-tag">{{ item.linked_binder_count }} linked binder{% if item.linked_binder_count != 1 %}s{% endif %}</span>
-                            {% endif %}
-                            {% if item.linked_trial_count %}
-                              <span class="card-tag">{{ item.linked_trial_count }} linked trial{% if item.linked_trial_count != 1 %}s{% endif %}</span>
-                            {% endif %}
-                          </div>
-
-                          <div class="explore-block">
-                            <div class="explore-title">Keep Exploring</div>
-                            <div class="explore-links">
-                              <a class="explore-link" href="/disease/{{ item.disease_id }}">Open disease page</a>
-                              <a class="explore-link" href="/?q={{ item.disease_name | urlencode }}+binders">Find binders</a>
-                              <a class="explore-link" href="/?q={{ item.disease_name | urlencode }}+trials">Find trials</a>
-                            </div>
                           </div>
                         </div>
                       {% endfor %}

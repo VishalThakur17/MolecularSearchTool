@@ -309,7 +309,7 @@
 
     <div class="page">
         <div class="hero">
-            <div class="eyebrow">Disease Exploration Hub</div>
+            <div class="eyebrow">Disease Tag Context</div>
             <h1>{{ disease.disease_name }}</h1>
             <p class="subtitle">
                 This page treats disease as a context layer that connects targets, binders, and trials, making it easier to keep exploring instead of stopping at a single record.
@@ -345,7 +345,7 @@
         <div class="main-grid">
             <div class="stack">
                 <div class="card">
-                    <h2>Disease Overview</h2>
+                    <h2>Disease Tag Overview</h2>
                     <div class="info-grid">
                         <div class="label">Disease Name</div>
                         <div class="value">{{ disease.disease_name or 'Not available' }}</div>
@@ -453,7 +453,7 @@
                 </div>
 
                 <div class="card">
-                    <h2>Clinical Trials in This Disease Context</h2>
+                    <h2>Clinical Trials in This Disease Tag Context</h2>
                     {% if trials and trials|length > 0 %}
                         <div class="list">
                             {% for trial in trials %}
@@ -472,7 +472,7 @@
                 </div>
 
                 <div class="card">
-                    <h2>Related Diseases</h2>
+                    <h2>Related Disease Tags</h2>
                     <p class="section-intro">
                         These diseases share proteins, binders, or trials with the current disease context.
                     </p>

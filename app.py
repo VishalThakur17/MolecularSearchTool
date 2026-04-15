@@ -1,8 +1,12 @@
 import os
 import re
+import math
+import shlex
 from collections import Counter
+from difflib import SequenceMatcher
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from dotenv import load_dotenv
+import requests
 import psycopg2
 import psycopg2.extras
 
@@ -15,6 +19,55 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "molecular_search_db")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+
+PRIMARY_BINDER_TYPES = ["IgG", "VHH", "Peptide"]
+EXTENDED_BINDER_TYPES = PRIMARY_BINDER_TYPES + ["Small Molecule", "Other"]
+
+
+def canonicalize_binder_type(value: str) -> str:
+    raw = safe_string(value).lower()
+    if not raw:
+        return "Other"
+
+    if raw in {"igg", "igg antibody", "antibody", "monoclonal antibody", "mab"} or raw.endswith("mab"):
+        return "IgG"
+    if raw in {"vhh", "nanobody", "single domain antibody"} or "nanobody" in raw or raw == "vhh":
+        return "VHH"
+    if raw in {"peptide", "oligopeptide", "protein peptide"} or "peptide" in raw:
+        return "Peptide"
+    if raw in {"small molecule", "small-molecule", "small_molecule", "drug", "compound"} or "small molecule" in raw:
+        return "Small Molecule"
+    return "Other"
+
+
+def binder_classification_family(value: str) -> str:
+    binder_type = canonicalize_binder_type(value)
+    if binder_type in PRIMARY_BINDER_TYPES:
+        return "Primary sponsor class"
+    if binder_type == "Small Molecule":
+        return "Extended class"
+    return "Unresolved / other"
+
+
+def decorate_binder_record(record: dict) -> dict:
+    if not record:
+        return record
+    binder_type = canonicalize_binder_type(record.get("binder_type") or record.get("modality_name"))
+    record["binder_type"] = binder_type
+    record["binder_class_family"] = binder_classification_family(binder_type)
+    record["is_primary_binder_class"] = binder_type in PRIMARY_BINDER_TYPES
+    record["disease_tags_label"] = "Disease tags"
+    return record
+
+
+def decorate_binder_records(records):
+    return [decorate_binder_record(r) for r in (records or [])]
+
+
+def summarize_binder_classes(records):
+    counter = Counter(canonicalize_binder_type((r or {}).get("binder_type") or (r or {}).get("modality_name")) for r in (records or []))
+    return summarize_counter(counter)
 
 
 def get_connection():
@@ -36,10 +89,10 @@ def get_filter_options():
                 FROM binders
                 WHERE binder_type IS NOT NULL
                   AND TRIM(binder_type) <> ''
-                  AND binder_type IN ('IgG', 'VHH', 'Peptide', 'Small Molecule', 'Other')
                 ORDER BY binder_type;
             """)
-            binder_types = [row["binder_type"] for row in cur.fetchall()]
+            binder_types = [canonicalize_binder_type(row["binder_type"]) for row in cur.fetchall()]
+            binder_types = [item for item in EXTENDED_BINDER_TYPES if item in set(binder_types)]
 
             cur.execute("""
                 SELECT DISTINCT clinical_status
@@ -95,6 +148,240 @@ def summarize_counter(counter_obj):
         {"label": label, "count": count}
         for label, count in counter_obj.most_common()
     ]
+
+
+AMINO_ACID_CHARS = set("ACDEFGHIKLMNPQRSTVWYBXZJUO")
+ALLOWED_STRUCTURE_EXTENSIONS = {".pdb", ".cif", ".mmcif"}
+
+def normalize_biological_sequence(sequence: str) -> str:
+    if not sequence:
+        return ""
+    cleaned_lines = []
+    for raw_line in sequence.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith(">"): continue
+        cleaned_lines.append(line)
+    compact = "".join(cleaned_lines) if cleaned_lines else sequence
+    compact = compact.upper().replace("*", "").replace("-", "")
+    compact = re.sub(r"[^A-Z]", "", compact)
+    return "".join(ch for ch in compact if ch in AMINO_ACID_CHARS)
+
+def sequence_preview(sequence: str, preview_len: int = 24) -> str:
+    seq = normalize_biological_sequence(sequence)
+    return seq if len(seq) <= preview_len else f"{seq[:preview_len]}…"
+
+def build_kmer_set(sequence: str, k: int = 3):
+    seq = normalize_biological_sequence(sequence)
+    if not seq: return set()
+    if len(seq) < k: return {seq}
+    return {seq[i:i+k] for i in range(len(seq)-k+1)}
+
+def calculate_sequence_similarity(query_sequence: str, candidate_sequence: str) -> float:
+    query = normalize_biological_sequence(query_sequence)
+    candidate = normalize_biological_sequence(candidate_sequence)
+    if not query or not candidate: return 0.0
+    if query == candidate: return 1.0
+    query_kmers = build_kmer_set(query, 3)
+    candidate_kmers = build_kmer_set(candidate, 3)
+    union = query_kmers | candidate_kmers
+    jaccard = (len(query_kmers & candidate_kmers) / len(union)) if union else 0.0
+    sequence_ratio = SequenceMatcher(None, query, candidate).ratio()
+    length_ratio = min(len(query), len(candidate)) / max(len(query), len(candidate))
+    containment_bonus = 0.08 if query in candidate or candidate in query else 0.0
+    score = (0.50 * sequence_ratio) + (0.35 * jaccard) + (0.15 * length_ratio) + containment_bonus
+    return round(min(score, 1.0), 6)
+
+def allowed_structure_filename(filename: str) -> bool:
+    filename = (filename or "").lower()
+    return any(filename.endswith(ext) for ext in ALLOWED_STRUCTURE_EXTENSIONS)
+
+def safe_float(value):
+    try:
+        if value in (None, "", ".", "?"): return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+def fetch_structure_text(url: str, timeout: int = 20) -> str:
+    response = requests.get(url, timeout=timeout)
+    response.raise_for_status()
+    return response.text
+
+def parse_pdb_coordinates(text: str):
+    atoms=[]; residues=set(); chains=set()
+    for line in text.splitlines():
+        if not (line.startswith("ATOM") or line.startswith("HETATM")): continue
+        try:
+            x=float(line[30:38].strip()); y=float(line[38:46].strip()); z=float(line[46:54].strip())
+        except ValueError:
+            continue
+        chain=line[21:22].strip() or "?"; resseq=line[22:26].strip() or "?"; resname=line[17:20].strip() or "UNK"
+        atoms.append((x,y,z)); residues.add((chain,resseq,resname)); chains.add(chain)
+    return atoms,residues,chains
+
+def tokenize_cif_line(line: str):
+    try: return shlex.split(line, posix=False)
+    except Exception: return line.split()
+
+def parse_mmcif_coordinates(text: str):
+    atoms=[]; residues=set(); chains=set(); lines=text.splitlines(); i=0
+    while i < len(lines):
+        if lines[i].strip() != 'loop_': i += 1; continue
+        i += 1; headers=[]
+        while i < len(lines) and lines[i].strip().startswith('_'):
+            headers.append(lines[i].strip()); i += 1
+        if not headers or not any(h.startswith('_atom_site.') for h in headers): continue
+        hi={h: idx for idx,h in enumerate(headers)}
+        x_idx=hi.get('_atom_site.Cartn_x'); y_idx=hi.get('_atom_site.Cartn_y'); z_idx=hi.get('_atom_site.Cartn_z')
+        chain_idx=hi.get('_atom_site.label_asym_id') or hi.get('_atom_site.auth_asym_id')
+        comp_idx=hi.get('_atom_site.label_comp_id'); seq_idx=hi.get('_atom_site.label_seq_id') or hi.get('_atom_site.auth_seq_id')
+        if x_idx is None or y_idx is None or z_idx is None: continue
+        while i < len(lines):
+            row=lines[i].strip()
+            if not row or row=='#' or row=='loop_' or row.startswith('data_') or row.startswith('_'): break
+            tokens=tokenize_cif_line(row)
+            if len(tokens) >= len(headers):
+                x=safe_float(tokens[x_idx]); y=safe_float(tokens[y_idx]); z=safe_float(tokens[z_idx])
+                if x is not None and y is not None and z is not None:
+                    chain=tokens[chain_idx] if chain_idx is not None and chain_idx < len(tokens) else '?'
+                    comp=tokens[comp_idx] if comp_idx is not None and comp_idx < len(tokens) else 'UNK'
+                    seq=tokens[seq_idx] if seq_idx is not None and seq_idx < len(tokens) else '?'
+                    atoms.append((x,y,z)); residues.add((chain,seq,comp)); chains.add(chain)
+            i += 1
+        continue
+    return atoms,residues,chains
+
+def compute_structure_signature_from_text(text: str, filename: str = 'uploaded_structure') -> dict:
+    filename=(filename or 'uploaded_structure').lower()
+    if filename.endswith('.pdb'): atoms,residues,chains=parse_pdb_coordinates(text)
+    else:
+        atoms,residues,chains=parse_mmcif_coordinates(text)
+        if not atoms: atoms,residues,chains=parse_pdb_coordinates(text)
+    if not atoms: raise ValueError('No atomic coordinates could be extracted from the uploaded structure. Please upload a valid PDB or mmCIF file.')
+    xs=[a[0] for a in atoms]; ys=[a[1] for a in atoms]; zs=[a[2] for a in atoms]
+    centroid=(sum(xs)/len(xs), sum(ys)/len(ys), sum(zs)/len(zs))
+    rg=math.sqrt(sum((x-centroid[0])**2 + (y-centroid[1])**2 + (z-centroid[2])**2 for x,y,z in atoms)/len(atoms))
+    span_x=max(xs)-min(xs); span_y=max(ys)-min(ys); span_z=max(zs)-min(zs); max_span=max(span_x,span_y,span_z,1.0)
+    return {'atom_count':len(atoms),'residue_count':len(residues),'chain_count':len(chains) or 1,'radius_gyration':round(rg,4),'span_x':round(span_x,4),'span_y':round(span_y,4),'span_z':round(span_z,4),'volume_hint':round(span_x*span_y*span_z,4),'compactness':round(rg/max_span,6)}
+
+def compare_structure_signatures(query_sig: dict, candidate_sig: dict) -> dict:
+    rel=lambda a,b: abs(a-b)/max(abs(a),abs(b),1.0)
+    atom_diff=rel(query_sig['atom_count'],candidate_sig['atom_count']); residue_diff=rel(query_sig['residue_count'],candidate_sig['residue_count'])
+    chain_diff=abs(query_sig['chain_count']-candidate_sig['chain_count']); rg_diff=rel(query_sig['radius_gyration'],candidate_sig['radius_gyration'])
+    span_diff=(rel(query_sig['span_x'],candidate_sig['span_x'])+rel(query_sig['span_y'],candidate_sig['span_y'])+rel(query_sig['span_z'],candidate_sig['span_z']))/3.0
+    compactness_diff=rel(query_sig['compactness'],candidate_sig['compactness'])
+    distance=(0.26*atom_diff + 0.20*residue_diff + 0.10*min(chain_diff,5)/5.0 + 0.20*rg_diff + 0.18*span_diff + 0.06*compactness_diff)
+    similarity=max(0.0, 1.0-min(distance,1.0))
+    return {'distance':round(distance,4),'similarity_score':round(similarity*100.0,2),'score_breakdown':{'atom_diff':round(atom_diff,4),'residue_diff':round(residue_diff,4),'chain_diff':int(chain_diff),'rg_diff':round(rg_diff,4),'span_diff':round(span_diff,4),'compactness_diff':round(compactness_diff,4)}}
+
+def load_structure_similarity_candidates(limit: int = 60):
+    sql="""
+        SELECT s.structure_id,s.pdb_id,s.structure_title,s.experimental_method,s.resolution,s.structure_file_url,
+               p.protein_id,p.protein_name,p.uniprot_accession,g.gene_symbol
+        FROM structures s
+        LEFT JOIN protein_structures ps ON s.structure_id = ps.structure_id
+        LEFT JOIN proteins p ON ps.protein_id = p.protein_id
+        LEFT JOIN genes g ON p.gene_id = g.gene_id
+        WHERE s.pdb_id IS NOT NULL
+        ORDER BY s.deposition_date DESC NULLS LAST, s.pdb_id
+        LIMIT %s;
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql,(limit,)); return cur.fetchall()
+
+def run_structure_similarity_search(uploaded_filename: str, uploaded_bytes: bytes, top_k: int = 10):
+    if not uploaded_bytes: raise ValueError('No structure file was uploaded.')
+    decoded=uploaded_bytes.decode('utf-8', errors='ignore')
+    query_signature=compute_structure_signature_from_text(decoded, uploaded_filename)
+    candidates=load_structure_similarity_candidates(); matches=[]; failures=[]
+    for row in candidates:
+        pdb_id=safe_string(row.get('pdb_id')); structure_url=safe_string(row.get('structure_file_url'))
+        if not structure_url and pdb_id: structure_url=f'https://files.rcsb.org/download/{pdb_id.upper()}.cif'
+        if not structure_url: continue
+        try:
+            candidate_text=fetch_structure_text(structure_url)
+            candidate_signature=compute_structure_signature_from_text(candidate_text, structure_url)
+            comparison=compare_structure_signatures(query_signature, candidate_signature)
+            matches.append({'structure_id':row.get('structure_id'),'pdb_id':pdb_id.upper() if pdb_id else None,'structure_title':row.get('structure_title'),'experimental_method':row.get('experimental_method'),'resolution':row.get('resolution'),'protein_id':row.get('protein_id'),'protein_name':row.get('protein_name'),'gene_symbol':row.get('gene_symbol'),'uniprot_accession':row.get('uniprot_accession'),'structure_file_url':structure_url,'viewer_url':build_molstar_pdb_viewer_url(pdb_id) if pdb_id else '','external_url':f'https://www.rcsb.org/structure/{pdb_id.upper()}' if pdb_id else structure_url, **comparison})
+        except Exception as exc:
+            failures.append(f"{pdb_id or structure_url}: {exc}")
+    matches.sort(key=lambda item: item['similarity_score'], reverse=True)
+    top_matches=matches[:top_k]
+    summary=(f'The uploaded structure "{uploaded_filename}" was compared against {len(matches)} linked structure candidates using an MVP structural signature based on atom count, residue count, chain count, overall span, and radius of gyration. The top match scored {top_matches[0]["similarity_score"]:.2f}% similarity.' if top_matches else 'The structure similarity workflow ran, but no comparable structures were available in the current dataset.')
+    return {'query_filename':uploaded_filename,'query_signature':query_signature,'matches':top_matches,'summary':summary,'failure_count':len(failures),'failures':failures[:5]}
+
+def fetch_sequence_similarity_results(query_sequence: str, binder_type=None, clinical_status=None, disease_name=None, limit: int = 25):
+    normalized_query=normalize_biological_sequence(query_sequence)
+    results={'diseases':[],'proteins':[],'binders':[],'trials':[],'intent':'sequence','primary_section':'binders','section_order':['binders','proteins','trials','diseases'],'sequence_query':normalized_query,'sequence_query_length':len(normalized_query),'sequence_strategy':'Local sequence similarity search across stored binder FASTA sequences'}
+    if len(normalized_query) < 12: return results
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            binder_sql="""
+                SELECT DISTINCT b.binder_id,b.binder_name,b.binder_type,b.sequence,b.clinical_status,b.mechanism_of_action,b.approval_status,bm.modality_name
+                FROM binders b
+                LEFT JOIN binder_modalities bm ON b.modality_id = bm.modality_id
+                LEFT JOIN binder_diseases bd ON b.binder_id = bd.binder_id
+                LEFT JOIN diseases d ON bd.disease_id = d.disease_id
+                WHERE b.sequence IS NOT NULL AND TRIM(b.sequence) <> ''
+            """
+            params=[]
+            if binder_type: binder_sql += ' AND b.binder_type = %s'; params.append(binder_type)
+            if clinical_status: binder_sql += ' AND b.clinical_status = %s'; params.append(clinical_status)
+            if disease_name: binder_sql += ' AND d.disease_name = %s'; params.append(disease_name)
+            binder_sql += ' ORDER BY b.binder_name;'; cur.execute(binder_sql, tuple(params)); binder_rows=cur.fetchall()
+            scored=[]
+            for row in binder_rows:
+                candidate_sequence=normalize_biological_sequence(row.get('sequence') or '')
+                if len(candidate_sequence) < 12: continue
+                similarity=calculate_sequence_similarity(normalized_query, candidate_sequence)
+                if similarity < 0.18: continue
+                row['sequence_length']=len(candidate_sequence); row['sequence_similarity_score']=round(similarity,4); row['sequence_similarity_percent']=round(similarity*100,1); row['query_sequence_preview']=sequence_preview(normalized_query); row['matched_sequence_preview']=sequence_preview(candidate_sequence)
+                scored.append(row)
+            scored.sort(key=lambda item:(-item['sequence_similarity_score'], item.get('binder_name') or ''))
+            top_binders=scored[:limit]; results['binders']=top_binders
+            binder_ids=[row['binder_id'] for row in top_binders if row.get('binder_id')]
+            if not binder_ids: return results
+            sim_map={row['binder_id']: row['sequence_similarity_score'] for row in top_binders if row.get('binder_id')}
+            cur.execute("""SELECT DISTINCT p.protein_id,p.protein_name,p.uniprot_accession,p.organism_name,p.functional_description,g.gene_symbol,g.gene_name,pb.binder_id FROM protein_binders pb JOIN proteins p ON pb.protein_id = p.protein_id LEFT JOIN genes g ON p.gene_id = g.gene_id WHERE pb.binder_id = ANY(%s) ORDER BY p.protein_name;""", (binder_ids,)); protein_rows=cur.fetchall(); pmap={}
+            for row in protein_rows:
+                pid=row['protein_id']; best=sim_map.get(row['binder_id'],0.0); existing=pmap.get(pid)
+                if not existing or best > existing['best_sequence_similarity']:
+                    cleaned=dict(row); cleaned.pop('binder_id',None); cleaned['best_sequence_similarity']=round(best,4); cleaned['best_sequence_similarity_percent']=round(best*100,1); pmap[pid]=cleaned
+            results['proteins']=sorted(pmap.values(), key=lambda item:(-item.get('best_sequence_similarity',0), item.get('protein_name') or ''))[:20]
+            cur.execute("""SELECT DISTINCT ct.trial_id,ct.nct_id,ct.trial_title,ct.condition_name,ct.phase,ct.recruitment_status,bt.binder_id FROM binder_trials bt JOIN clinical_trials ct ON bt.trial_id = ct.trial_id WHERE bt.binder_id = ANY(%s) ORDER BY ct.trial_title;""", (binder_ids,)); trial_rows=cur.fetchall(); tmap={}
+            for row in trial_rows:
+                tid=row['trial_id']; best=sim_map.get(row['binder_id'],0.0); existing=tmap.get(tid)
+                if not existing or best > existing['best_sequence_similarity']:
+                    cleaned=dict(row); cleaned.pop('binder_id',None); cleaned['best_sequence_similarity']=round(best,4); cleaned['best_sequence_similarity_percent']=round(best*100,1); tmap[tid]=cleaned
+            results['trials']=sorted(tmap.values(), key=lambda item:(-item.get('best_sequence_similarity',0), item.get('trial_title') or ''))[:20]
+            cur.execute("""SELECT DISTINCT d.disease_id,d.disease_name,d.disease_category,d.description,bd.binder_id FROM binder_diseases bd JOIN diseases d ON bd.disease_id = d.disease_id WHERE bd.binder_id = ANY(%s) ORDER BY d.disease_name;""", (binder_ids,)); disease_rows=cur.fetchall(); dmap={}
+            for row in disease_rows:
+                did=row['disease_id']; best=sim_map.get(row['binder_id'],0.0); existing=dmap.get(did)
+                if not existing or best > existing['best_sequence_similarity']:
+                    cleaned=dict(row); cleaned.pop('binder_id',None); cleaned['best_sequence_similarity']=round(best,4); cleaned['best_sequence_similarity_percent']=round(best*100,1); dmap[did]=cleaned
+            results['diseases']=sorted(dmap.values(), key=lambda item:(-item.get('best_sequence_similarity',0), item.get('disease_name') or ''))[:20]
+    results['binders']=decorate_binder_records(results.get('binders',[])); results=enrich_search_results(results); results['binder_class_breakdown']=summarize_binder_classes(results.get('binders',[])); return results
+
+def apply_result_sorting(results: dict, binder_sort='relevance', protein_sort='relevance', trial_sort='relevance', disease_sort='relevance'):
+    s=lambda v: safe_string(v).lower()
+    binders=results.get('binders') or []; proteins=results.get('proteins') or []; trials=results.get('trials') or []; diseases=results.get('diseases') or []
+    if binder_sort == 'name_asc': binders.sort(key=lambda x: s(x.get('binder_name')))
+    elif binder_sort == 'name_desc': binders.sort(key=lambda x: s(x.get('binder_name')), reverse=True)
+    elif binder_sort == 'binder_type': binders.sort(key=lambda x: (s(x.get('binder_type')), s(x.get('binder_name'))))
+    elif binder_sort == 'clinical_status': binders.sort(key=lambda x: (s(x.get('clinical_status') or x.get('approval_status')), s(x.get('binder_name'))))
+    if protein_sort == 'gene_symbol': proteins.sort(key=lambda x: (s(x.get('gene_symbol')), s(x.get('protein_name'))))
+    elif protein_sort == 'protein_name': proteins.sort(key=lambda x: s(x.get('protein_name')))
+    elif protein_sort == 'uniprot_accession': proteins.sort(key=lambda x: s(x.get('uniprot_accession')))
+    if trial_sort == 'nct_id': trials.sort(key=lambda x: s(x.get('nct_id')))
+    elif trial_sort == 'phase': trials.sort(key=lambda x: (s(x.get('phase')), s(x.get('trial_title'))))
+    elif trial_sort == 'recruitment_status': trials.sort(key=lambda x: (s(x.get('recruitment_status')), s(x.get('trial_title'))))
+    elif trial_sort == 'title': trials.sort(key=lambda x: s(x.get('trial_title')))
+    if disease_sort == 'disease_name': diseases.sort(key=lambda x: s(x.get('disease_name')))
+    elif disease_sort == 'disease_category': diseases.sort(key=lambda x: (s(x.get('disease_category')), s(x.get('disease_name'))))
+    results.update({'binders':binders,'proteins':proteins,'trials':trials,'diseases':diseases,'sorts':{'binder_sort':binder_sort,'protein_sort':protein_sort,'trial_sort':trial_sort,'disease_sort':disease_sort}})
+    return results
+
 
 
 def build_molstar_pdb_viewer_url(pdb_id: str) -> str:
@@ -367,7 +654,7 @@ def decide_search_route(query: str, binder_type=None, clinical_status=None, dise
             "mode": "results",
             "intent": intent,
             "effective_query": q,
-            "route_hint": "Sequence-like input detected. Showing binder-first matches as a placeholder for future sequence search.",
+            "route_hint": "Sequence-like input detected. Running binder-sequence similarity search across stored FASTA sequences.",
             "auto_disease_name": disease_name
         }
 
@@ -787,8 +1074,10 @@ def search_database(search_term: str, binder_type=None, clinical_status=None, di
             cur.execute(trial_sql, tuple(trial_params))
             results["trials"] = cur.fetchall()
 
+    results["binders"] = decorate_binder_records(results.get("binders", []))
     results = reorder_results_by_intent(results, intent)
     results = enrich_search_results(results)
+    results["binder_class_breakdown"] = summarize_binder_classes(results.get("binders", []))
     return results
 
 
@@ -813,7 +1102,7 @@ def build_free_summary(query: str, results: dict, binder_type=None, clinical_sta
     intent_labels = {
         "binder": "binder-focused",
         "protein": "target/protein-focused",
-        "disease": "disease-filtered",
+        "disease": "disease-tag-filtered",
         "trial": "clinical-trial-focused",
         "sequence": "sequence-style",
         "general": "general"
@@ -825,7 +1114,7 @@ def build_free_summary(query: str, results: dict, binder_type=None, clinical_sta
     if clinical_status:
         filter_parts.append(f"clinical status = {clinical_status}")
     if disease_name:
-        filter_parts.append(f"disease = {disease_name}")
+        filter_parts.append(f"disease tag = {disease_name}")
 
     filter_text = ""
     if filter_parts:
@@ -846,7 +1135,7 @@ def build_free_summary(query: str, results: dict, binder_type=None, clinical_sta
         )
     elif intent == "disease":
         parts.append(
-            "This disease-style query is shown as a filtered exploration view rather than redirecting to a single disease page."
+            "This disease-style query is shown as a disease-tag exploration view rather than making disease the primary organizing pillar."
         )
     elif intent == "protein":
         parts.append(
@@ -881,68 +1170,44 @@ def build_free_summary(query: str, results: dict, binder_type=None, clinical_sta
     return " ".join(parts)
 
 
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET", "POST"])
 def index():
-    query = request.args.get("q", "").strip()
-    binder_type = request.args.get("binder_type", "").strip() or None
-    clinical_status = request.args.get("clinical_status", "").strip() or None
-    disease_name = request.args.get("disease_name", "").strip() or None
-
-    results = None
-    error = None
-    summary = None
-    route_hint = None
-    effective_query = query
-    filter_options = get_filter_options()
-
-    if query:
+    query = request.values.get("q", "").strip()
+    binder_type = request.values.get("binder_type", "").strip() or None
+    clinical_status = request.values.get("clinical_status", "").strip() or None
+    disease_name = request.values.get("disease_name", "").strip() or None
+    binder_sort = request.values.get("binder_sort", "relevance").strip() or "relevance"
+    protein_sort = request.values.get("protein_sort", "relevance").strip() or "relevance"
+    trial_sort = request.values.get("trial_sort", "relevance").strip() or "relevance"
+    disease_sort = request.values.get("disease_sort", "relevance").strip() or "relevance"
+    results = None; error = None; summary = None; route_hint = None; effective_query = query
+    filter_options = get_filter_options(); structure_results = None; structure_error = None
+    if request.method == "POST":
+        uploaded_file = request.files.get("structure_file")
+        if not uploaded_file or not uploaded_file.filename:
+            structure_error = "Please choose a PDB or mmCIF file before running structure similarity search."
+        elif not allowed_structure_filename(uploaded_file.filename):
+            structure_error = "Unsupported structure file type. Please upload a .pdb, .cif, or .mmcif file."
+        else:
+            try: structure_results = run_structure_similarity_search(uploaded_file.filename, uploaded_file.read())
+            except Exception as e: structure_error = str(e)
+    elif query:
         try:
-            route_decision = decide_search_route(
-                query,
-                binder_type=binder_type,
-                clinical_status=clinical_status,
-                disease_name=disease_name
-            )
-
-            if route_decision["mode"] == "redirect":
-                return redirect(url_for(route_decision["endpoint"], **route_decision["values"]))
-
-            effective_query = route_decision["effective_query"]
-            disease_name = route_decision["auto_disease_name"]
-            route_hint = route_decision["route_hint"]
-
-            results = search_database(
-                effective_query,
-                binder_type=binder_type,
-                clinical_status=clinical_status,
-                disease_name=disease_name
-            )
-            summary = build_free_summary(
-                query,
-                results,
-                binder_type=binder_type,
-                clinical_status=clinical_status,
-                disease_name=disease_name
-            )
+            route_decision = decide_search_route(query, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
+            if route_decision["mode"] == "redirect": return redirect(url_for(route_decision["endpoint"], **route_decision["values"]))
+            effective_query = route_decision["effective_query"]; disease_name = route_decision["auto_disease_name"]; route_hint = route_decision["route_hint"]
+            if route_decision.get("intent") == "sequence":
+                results = fetch_sequence_similarity_results(effective_query, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
+            else:
+                results = search_database(effective_query, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
+            results = apply_result_sorting(results, binder_sort, protein_sort, trial_sort, disease_sort)
+            summary = build_free_summary(query, results, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
         except Exception as e:
             error = str(e)
-
-    return render_template(
-        "index.html",
-        query=query,
-        effective_query=effective_query,
-        results=results,
-        error=error,
-        summary=summary,
-        route_hint=route_hint,
-        filter_options=filter_options,
-        selected_binder_type=binder_type,
-        selected_clinical_status=clinical_status,
-        selected_disease_name=disease_name
-    )
-
+    return render_template("index.html", query=query, effective_query=effective_query, results=results, error=error, summary=summary, route_hint=route_hint, filter_options=filter_options, selected_binder_type=binder_type, selected_clinical_status=clinical_status, selected_disease_name=disease_name, selected_binder_sort=binder_sort, selected_protein_sort=protein_sort, selected_trial_sort=trial_sort, selected_disease_sort=disease_sort, structure_results=structure_results, structure_error=structure_error)
 
 @app.route("/api/search", methods=["GET"])
+
 def api_search():
     query = request.args.get("q", "").strip()
     binder_type = request.args.get("binder_type", "").strip() or None
@@ -1088,9 +1353,8 @@ def protein_detail(protein_id):
             """, (protein_id,))
             structures = cur.fetchall()
 
-    binder_type_breakdown = summarize_counter(
-        Counter((b.get("binder_type") or "Unclassified") for b in binders)
-    )
+    binders = decorate_binder_records(binders)
+    binder_type_breakdown = summarize_binder_classes(binders)
     binder_status_breakdown = summarize_counter(
         Counter((b.get("clinical_status") or b.get("approval_status") or "Unknown") for b in binders)
     )
@@ -1140,6 +1404,8 @@ def binder_detail(binder_id):
 
             if not binder:
                 return "Binder not found", 404
+
+            binder = decorate_binder_record(binder)
 
             cur.execute("""
                 SELECT
@@ -1277,12 +1543,19 @@ def binder_detail(binder_id):
     structure_count = len(structures)
     sequence_length = len((binder.get("sequence") or "").replace("\n", "").replace(" ", "")) if binder.get("sequence") else 0
 
+    related_binders = decorate_binder_records(related_binders)
+
     trial_phase_breakdown = summarize_counter(
         Counter((t.get("phase") or "Unknown") for t in trials)
     )
     disease_category_breakdown = summarize_counter(
         Counter((d.get("disease_category") or "Uncategorized") for d in diseases)
     )
+    binder_classification = {
+        "binder_type": binder.get("binder_type") or "Other",
+        "class_family": binder.get("binder_class_family") or "Unresolved / other",
+        "is_primary": binder.get("is_primary_binder_class", False)
+    }
 
     binder_story_parts = []
     binder_story_parts.append(
@@ -1474,9 +1747,8 @@ def trial_detail(trial_id):
             """, (trial_id, trial_id, trial_id, trial_id))
             related_trials = cur.fetchall()
 
-    binder_type_breakdown = summarize_counter(
-        Counter((b.get("binder_type") or "Unclassified") for b in binders)
-    )
+    binders = decorate_binder_records(binders)
+    binder_type_breakdown = summarize_binder_classes(binders)
     trial_context_counts = {
         "binders": len(binders),
         "proteins": len(proteins),
@@ -1599,9 +1871,8 @@ def disease_detail(disease_id):
             """, (disease_id, disease_id, disease_id, disease_id))
             related_diseases = cur.fetchall()
 
-    binder_type_breakdown = summarize_counter(
-        Counter((b.get("binder_type") or "Unclassified") for b in binders)
-    )
+    binders = decorate_binder_records(binders)
+    binder_type_breakdown = summarize_binder_classes(binders)
     protein_gene_breakdown = summarize_counter(
         Counter((p.get("gene_symbol") or p.get("protein_name") or "Unknown target") for p in proteins[:12])
     )
@@ -1619,4 +1890,5 @@ def disease_detail(disease_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    app.run(debug=debug_mode)

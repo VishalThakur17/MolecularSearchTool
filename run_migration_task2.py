@@ -29,4 +29,4 @@ with get_connection() as conn:
         cur.execute(sql)
     conn.commit()
 
-print("✅ Task 2 migration completed successfully")
+print("Task 2 migration completed successfully")

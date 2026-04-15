@@ -23,4 +23,4 @@ with get_connection() as conn:
         cur.execute(sql)
     conn.commit()
 
-print("✅ Migration completed successfully")
+print("Migration completed successfully")
