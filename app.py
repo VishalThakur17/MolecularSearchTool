@@ -2,6 +2,7 @@ import os
 import re
 import math
 import shlex
+from functools import lru_cache
 from collections import Counter
 from difflib import SequenceMatcher
 from flask import Flask, render_template, request, jsonify, redirect, url_for
@@ -70,6 +71,154 @@ def summarize_binder_classes(records):
     return summarize_counter(counter)
 
 
+def build_binder_classification(binder: dict, proteins=None, trials=None, diseases=None, structures=None) -> dict:
+    binder = binder or {}
+    proteins = proteins or []
+    trials = trials or []
+    diseases = diseases or []
+    structures = structures or []
+
+    binder_type = binder.get("binder_type") or canonicalize_binder_type(binder.get("modality_name"))
+    return {
+        "binder_type": binder_type or "Other",
+        "class_family": binder.get("binder_class_family") or binder_classification_family(binder_type),
+        "is_primary_class": binder_type in PRIMARY_BINDER_TYPES,
+        "linked_target_count": len(proteins),
+        "linked_trial_count": len(trials),
+        "linked_disease_count": len(diseases),
+        "linked_structure_count": len(structures),
+    }
+
+
+def build_binder_visualization(binder: dict, proteins=None, diseases=None, trials=None, related_binders=None) -> dict:
+    proteins = proteins or []
+    diseases = diseases or []
+    trials = trials or []
+    related_binders = related_binders or []
+
+    node_specs = []
+    for row in proteins[:3]:
+        label = safe_string(row.get("gene_symbol")) or safe_string(row.get("protein_name")) or "Target"
+        node_specs.append({
+            "category": "protein",
+            "label": label[:16],
+            "full_label": label,
+            "subtitle": "Target",
+            "href": url_for("protein_detail", protein_id=row.get("protein_id")),
+        })
+    for row in diseases[:2]:
+        label = safe_string(row.get("disease_name")) or "Disease"
+        node_specs.append({
+            "category": "disease",
+            "label": label[:16],
+            "full_label": label,
+            "subtitle": "Disease",
+            "href": url_for("disease_detail", disease_id=row.get("disease_id")),
+        })
+    for row in trials[:2]:
+        label = safe_string(row.get("nct_id")) or safe_string(row.get("trial_title")) or "Trial"
+        node_specs.append({
+            "category": "trial",
+            "label": label[:16],
+            "full_label": safe_string(row.get("trial_title")) or label,
+            "subtitle": safe_string(row.get("phase")) or "Trial",
+            "href": url_for("trial_detail", trial_id=row.get("trial_id")),
+        })
+    for row in related_binders[:1]:
+        label = safe_string(row.get("binder_name")) or "Binder"
+        node_specs.append({
+            "category": "binder",
+            "label": label[:16],
+            "full_label": label,
+            "subtitle": safe_string(row.get("binder_type")) or "Related",
+            "href": url_for("binder_detail", binder_id=row.get("binder_id")),
+        })
+
+    positions = [
+        (250, 62), (405, 110), (438, 240), (330, 314),
+        (170, 314), (62, 240), (95, 110), (250, 338),
+    ]
+
+    nodes = []
+    for index, spec in enumerate(node_specs[:len(positions)]):
+        x, y = positions[index]
+        nodes.append({
+            **spec,
+            "x": x,
+            "y": y,
+            "line_x1": 250,
+            "line_y1": 180,
+            "line_x2": x,
+            "line_y2": y,
+        })
+
+    legend = [
+        {"label": "Targets", "count": len(proteins)},
+        {"label": "Disease Tags", "count": len(diseases)},
+        {"label": "Trials", "count": len(trials)},
+        {"label": "Related Binders", "count": len(related_binders)},
+    ]
+
+    return {
+        "center_label": safe_string((binder or {}).get("binder_name"))[:22] or "Binder",
+        "center_type": safe_string((binder or {}).get("binder_type")) or "Binder",
+        "nodes": nodes,
+        "legend": legend,
+        "note": "The center node is the selected binder. Outer nodes summarize the strongest linked targets, diseases, trials, and neighboring binders.",
+    }
+
+
+def execute_search(query: str, binder_type=None, clinical_status=None, disease_name=None):
+    route_decision = decide_search_route(
+        query,
+        binder_type=binder_type,
+        clinical_status=clinical_status,
+        disease_name=disease_name,
+    )
+
+    if route_decision["mode"] == "redirect":
+        return {
+            "route_decision": route_decision,
+            "effective_query": route_decision.get("effective_query", query),
+            "results": None,
+            "summary": None,
+        }
+
+    effective_query = route_decision["effective_query"]
+    resolved_disease_name = route_decision["auto_disease_name"]
+
+    if route_decision.get("intent") == "sequence":
+        results = fetch_sequence_similarity_results(
+            effective_query,
+            binder_type=binder_type,
+            clinical_status=clinical_status,
+            disease_name=resolved_disease_name,
+        )
+    else:
+        results = search_database(
+            effective_query,
+            binder_type=binder_type,
+            clinical_status=clinical_status,
+            disease_name=resolved_disease_name,
+        )
+
+    summary = build_free_summary(
+        query,
+        results,
+        binder_type=binder_type,
+        clinical_status=clinical_status,
+        disease_name=resolved_disease_name,
+    )
+
+    return {
+        "route_decision": route_decision,
+        "effective_query": effective_query,
+        "resolved_disease_name": resolved_disease_name,
+        "results": results,
+        "summary": summary,
+    }
+
+
 def get_connection():
     return psycopg2.connect(
         host=DB_HOST,
@@ -114,6 +263,17 @@ def get_filter_options():
         "clinical_statuses": clinical_statuses,
         "diseases": diseases
     }
+
+
+def get_filter_options_safe():
+    try:
+        return get_filter_options()
+    except Exception:
+        return {
+            "binder_types": [],
+            "clinical_statuses": [],
+            "diseases": []
+        }
 
 
 def is_fasta_like(query: str) -> bool:
@@ -202,7 +362,8 @@ def safe_float(value):
     except (TypeError, ValueError):
         return None
 
-def fetch_structure_text(url: str, timeout: int = 20) -> str:
+@lru_cache(maxsize=128)
+def fetch_structure_text(url: str, timeout: int = 8) -> str:
     response = requests.get(url, timeout=timeout)
     response.raise_for_status()
     return response.text
@@ -274,7 +435,7 @@ def compare_structure_signatures(query_sig: dict, candidate_sig: dict) -> dict:
     similarity=max(0.0, 1.0-min(distance,1.0))
     return {'distance':round(distance,4),'similarity_score':round(similarity*100.0,2),'score_breakdown':{'atom_diff':round(atom_diff,4),'residue_diff':round(residue_diff,4),'chain_diff':int(chain_diff),'rg_diff':round(rg_diff,4),'span_diff':round(span_diff,4),'compactness_diff':round(compactness_diff,4)}}
 
-def load_structure_similarity_candidates(limit: int = 60):
+def load_structure_similarity_candidates(limit: int = 24):
     sql="""
         SELECT s.structure_id,s.pdb_id,s.structure_title,s.experimental_method,s.resolution,s.structure_file_url,
                p.protein_id,p.protein_name,p.uniprot_accession,g.gene_symbol
@@ -291,25 +452,60 @@ def load_structure_similarity_candidates(limit: int = 60):
             cur.execute(sql,(limit,)); return cur.fetchall()
 
 def run_structure_similarity_search(uploaded_filename: str, uploaded_bytes: bytes, top_k: int = 10):
-    if not uploaded_bytes: raise ValueError('No structure file was uploaded.')
-    decoded=uploaded_bytes.decode('utf-8', errors='ignore')
-    query_signature=compute_structure_signature_from_text(decoded, uploaded_filename)
-    candidates=load_structure_similarity_candidates(); matches=[]; failures=[]
+    if not uploaded_bytes:
+        raise ValueError('No structure file was uploaded.')
+
+    decoded = uploaded_bytes.decode('utf-8', errors='ignore')
+    query_signature = compute_structure_signature_from_text(decoded, uploaded_filename)
+    candidates = load_structure_similarity_candidates(limit=max(top_k * 2, 24))
+    matches = []
+    failures = []
+
     for row in candidates:
-        pdb_id=safe_string(row.get('pdb_id')); structure_url=safe_string(row.get('structure_file_url'))
-        if not structure_url and pdb_id: structure_url=f'https://files.rcsb.org/download/{pdb_id.upper()}.cif'
-        if not structure_url: continue
+        pdb_id = safe_string(row.get('pdb_id'))
+        structure_url = safe_string(row.get('structure_file_url'))
+        if not structure_url and pdb_id:
+            structure_url = f'https://files.rcsb.org/download/{pdb_id.upper()}.cif'
+        if not structure_url:
+            continue
+
         try:
-            candidate_text=fetch_structure_text(structure_url)
-            candidate_signature=compute_structure_signature_from_text(candidate_text, structure_url)
-            comparison=compare_structure_signatures(query_signature, candidate_signature)
-            matches.append({'structure_id':row.get('structure_id'),'pdb_id':pdb_id.upper() if pdb_id else None,'structure_title':row.get('structure_title'),'experimental_method':row.get('experimental_method'),'resolution':row.get('resolution'),'protein_id':row.get('protein_id'),'protein_name':row.get('protein_name'),'gene_symbol':row.get('gene_symbol'),'uniprot_accession':row.get('uniprot_accession'),'structure_file_url':structure_url,'viewer_url':build_molstar_pdb_viewer_url(pdb_id) if pdb_id else '','external_url':f'https://www.rcsb.org/structure/{pdb_id.upper()}' if pdb_id else structure_url, **comparison})
+            candidate_text = fetch_structure_text(structure_url)
+            candidate_signature = compute_structure_signature_from_text(candidate_text, structure_url)
+            comparison = compare_structure_signatures(query_signature, candidate_signature)
+            matches.append({
+                'structure_id': row.get('structure_id'),
+                'pdb_id': pdb_id.upper() if pdb_id else None,
+                'structure_title': row.get('structure_title'),
+                'experimental_method': row.get('experimental_method'),
+                'resolution': row.get('resolution'),
+                'protein_id': row.get('protein_id'),
+                'protein_name': row.get('protein_name'),
+                'gene_symbol': row.get('gene_symbol'),
+                'uniprot_accession': row.get('uniprot_accession'),
+                'structure_file_url': structure_url,
+                'viewer_url': build_molstar_pdb_viewer_url(pdb_id) if pdb_id else '',
+                'external_url': f'https://www.rcsb.org/structure/{pdb_id.upper()}' if pdb_id else structure_url,
+                **comparison,
+            })
         except Exception as exc:
             failures.append(f"{pdb_id or structure_url}: {exc}")
+
     matches.sort(key=lambda item: item['similarity_score'], reverse=True)
-    top_matches=matches[:top_k]
-    summary=(f'The uploaded structure "{uploaded_filename}" was compared against {len(matches)} linked structure candidates using an MVP structural signature based on atom count, residue count, chain count, overall span, and radius of gyration. The top match scored {top_matches[0]["similarity_score"]:.2f}% similarity.' if top_matches else 'The structure similarity workflow ran, but no comparable structures were available in the current dataset.')
-    return {'query_filename':uploaded_filename,'query_signature':query_signature,'matches':top_matches,'summary':summary,'failure_count':len(failures),'failures':failures[:5]}
+    top_matches = matches[:top_k]
+    summary = (
+        f'The uploaded structure "{uploaded_filename}" was compared against {len(matches)} linked structure candidates using an MVP structural signature based on atom count, residue count, chain count, overall span, and radius of gyration. The top match scored {top_matches[0]["similarity_score"]:.2f}% similarity.'
+        if top_matches else
+        'The structure similarity workflow ran, but no comparable structures were available in the current dataset.'
+    )
+    return {
+        'query_filename': uploaded_filename,
+        'query_signature': query_signature,
+        'matches': top_matches,
+        'summary': summary,
+        'failure_count': len(failures),
+        'failures': failures[:5],
+    }
 
 def fetch_sequence_similarity_results(query_sequence: str, binder_type=None, clinical_status=None, disease_name=None, limit: int = 25):
     normalized_query=normalize_biological_sequence(query_sequence)
@@ -451,6 +647,229 @@ def build_structure_candidates(structures, fallback_uniprot=None, fallback_title
         })
 
     return dedupe_structure_candidates(candidates)
+
+
+BINDING_REGION_COLORS = [
+    "#dc2626", "#2563eb", "#16a34a", "#d97706", "#7c3aed",
+    "#0891b2", "#db2777", "#4f46e5", "#65a30d", "#ea580c"
+]
+
+
+def table_exists(cur, table_name: str) -> bool:
+    cur.execute("""
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = %s
+        ) AS exists;
+    """, (table_name,))
+    row = cur.fetchone()
+    if isinstance(row, dict):
+        return bool(row.get('exists'))
+    return bool(row[0]) if row else False
+
+
+def binding_region_color(index: int) -> str:
+    return BINDING_REGION_COLORS[index % len(BINDING_REGION_COLORS)]
+
+
+def _safe_int(value, default=None):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _build_annotation_entry(row: dict, protein_length: int, fallback_index: int = 0, inferred: bool = False) -> dict:
+    protein_length = _safe_int(protein_length, 0) or 0
+    if protein_length <= 0:
+        protein_length = 1000
+
+    start = _safe_int(row.get('region_start'))
+    end = _safe_int(row.get('region_end'))
+    if start is None or end is None or end < start:
+        # fallback conceptual band if a record exists but lacks coordinates
+        width = max(20, protein_length // 10)
+        start = min(protein_length, 1 + fallback_index * max(25, protein_length // 12))
+        end = min(protein_length, start + width)
+        inferred = True
+
+    start = max(1, min(start, protein_length))
+    end = max(start, min(end, protein_length))
+    span = max(1, end - start + 1)
+    left_percent = ((start - 1) / protein_length) * 100.0
+    width_percent = max(1.5, (span / protein_length) * 100.0)
+    center_percent = min(100.0, left_percent + (width_percent / 2.0))
+    color = row.get('color_hex') or binding_region_color(fallback_index)
+
+    evidence = safe_string(row.get('evidence_type')) or ('Inferred layout' if inferred else 'Annotation')
+    label = safe_string(row.get('region_label')) or ('Conceptual interaction zone' if inferred else 'Binding region')
+
+    return {
+        'binder_id': row.get('binder_id'),
+        'binder_name': row.get('binder_name') or 'Unknown binder',
+        'protein_id': row.get('protein_id'),
+        'protein_name': row.get('protein_name') or 'Unknown protein',
+        'gene_symbol': row.get('gene_symbol'),
+        'region_start': start,
+        'region_end': end,
+        'region_span': span,
+        'region_label': label,
+        'evidence_type': evidence,
+        'source_note': row.get('source_note') or '',
+        'color_hex': color,
+        'left_percent': round(left_percent, 3),
+        'width_percent': round(width_percent, 3),
+        'center_percent': round(center_percent, 3),
+        'inferred': inferred,
+    }
+
+
+def infer_binding_annotations_for_protein(protein: dict, binders: list) -> list:
+    binders = binders or []
+    if not binders:
+        return []
+    protein_length = _safe_int(protein.get('sequence_length'), 0) or max(300, 80 * len(binders))
+    spacing = max(24, protein_length // max(len(binders) + 1, 2))
+    zone_width = max(18, min(70, protein_length // max(len(binders), 4)))
+    annotations = []
+    for idx, binder in enumerate(binders):
+        start = 1 + idx * spacing
+        end = min(protein_length, start + zone_width)
+        annotations.append(_build_annotation_entry({
+            'binder_id': binder.get('binder_id'),
+            'binder_name': binder.get('binder_name'),
+            'protein_id': protein.get('protein_id'),
+            'protein_name': protein.get('protein_name'),
+            'gene_symbol': protein.get('gene_symbol'),
+            'region_start': start,
+            'region_end': end,
+            'region_label': f"Conceptual site for {binder.get('binder_name') or 'binder'}",
+            'evidence_type': 'Inferred layout',
+            'source_note': 'Generated from binder-target links because no residue-level annotation is stored yet.',
+            'color_hex': binding_region_color(idx),
+        }, protein_length, fallback_index=idx, inferred=True))
+    return annotations
+
+
+def load_binding_annotations_for_protein(cur, protein: dict, binders: list) -> tuple[list, str]:
+    if not table_exists(cur, 'binder_binding_sites'):
+        inferred = infer_binding_annotations_for_protein(protein, binders)
+        return inferred, ('inferred' if inferred else 'none')
+
+    cur.execute("""
+        SELECT
+            bbs.binding_site_id,
+            bbs.binder_id,
+            bbs.protein_id,
+            bbs.region_start,
+            bbs.region_end,
+            bbs.region_label,
+            bbs.evidence_type,
+            bbs.source_note,
+            bbs.color_hex,
+            b.binder_name,
+            p.protein_name,
+            g.gene_symbol
+        FROM binder_binding_sites bbs
+        JOIN binders b ON bbs.binder_id = b.binder_id
+        JOIN proteins p ON bbs.protein_id = p.protein_id
+        LEFT JOIN genes g ON p.gene_id = g.gene_id
+        WHERE bbs.protein_id = %s
+        ORDER BY COALESCE(bbs.region_start, 999999), b.binder_name;
+    """, (protein.get('protein_id'),))
+    rows = cur.fetchall() or []
+    if rows:
+        protein_length = _safe_int(protein.get('sequence_length'), 0) or 1000
+        annotations = [
+            _build_annotation_entry(row, protein_length, fallback_index=i, inferred=False)
+            for i, row in enumerate(rows)
+        ]
+        return annotations, 'annotated'
+
+    inferred = infer_binding_annotations_for_protein(protein, binders)
+    return inferred, ('inferred' if inferred else 'none')
+
+
+def build_binder_binding_maps(cur, binder: dict, proteins: list) -> tuple[list, str]:
+    proteins = proteins or []
+    if not proteins:
+        return [], 'none'
+
+    annotations_by_protein = {}
+    mode = 'none'
+    if table_exists(cur, 'binder_binding_sites'):
+        cur.execute("""
+            SELECT
+                bbs.binding_site_id,
+                bbs.binder_id,
+                bbs.protein_id,
+                bbs.region_start,
+                bbs.region_end,
+                bbs.region_label,
+                bbs.evidence_type,
+                bbs.source_note,
+                bbs.color_hex,
+                b.binder_name,
+                p.protein_name,
+                g.gene_symbol
+            FROM binder_binding_sites bbs
+            JOIN binders b ON bbs.binder_id = b.binder_id
+            JOIN proteins p ON bbs.protein_id = p.protein_id
+            LEFT JOIN genes g ON p.gene_id = g.gene_id
+            WHERE bbs.binder_id = %s
+            ORDER BY p.protein_name, COALESCE(bbs.region_start, 999999);
+        """, (binder.get('binder_id'),))
+        rows = cur.fetchall() or []
+        if rows:
+            mode = 'annotated'
+            for i, row in enumerate(rows):
+                annotations_by_protein.setdefault(row.get('protein_id'), []).append(row)
+
+    maps = []
+    for idx, protein in enumerate(proteins):
+        protein_length = _safe_int(protein.get('sequence_length'), 0) or 1000
+        if mode == 'annotated' and annotations_by_protein.get(protein.get('protein_id')):
+            annotations = [
+                _build_annotation_entry(row, protein_length, fallback_index=j, inferred=False)
+                for j, row in enumerate(annotations_by_protein[protein.get('protein_id')])
+            ]
+        else:
+            mode = 'inferred'
+            annotations = [
+                _build_annotation_entry({
+                    'binder_id': binder.get('binder_id'),
+                    'binder_name': binder.get('binder_name'),
+                    'protein_id': protein.get('protein_id'),
+                    'protein_name': protein.get('protein_name'),
+                    'gene_symbol': protein.get('gene_symbol'),
+                    'region_start': 1 + idx * 75,
+                    'region_end': min(protein_length, (1 + idx * 75) + max(24, protein_length // 8)),
+                    'region_label': f"Conceptual site on {protein.get('gene_symbol') or protein.get('protein_name')}",
+                    'evidence_type': 'Inferred layout',
+                    'source_note': 'Generated from the binder-target relationship because no explicit binding-site coordinates are stored yet.',
+                    'color_hex': binding_region_color(idx),
+                }, protein_length, fallback_index=idx, inferred=True)
+            ]
+        maps.append({
+            'protein_id': protein.get('protein_id'),
+            'protein_label': protein.get('gene_symbol') or protein.get('protein_name') or 'Target',
+            'protein_name': protein.get('protein_name') or 'Unknown protein',
+            'gene_symbol': protein.get('gene_symbol') or '',
+            'uniprot_accession': protein.get('uniprot_accession') or '',
+            'sequence_length': protein_length,
+            'interaction_type': protein.get('interaction_type') or 'Interaction not available',
+            'annotations': annotations,
+        })
+    return maps, mode
+
+
+def build_binding_region_summary(annotations: list, mode: str) -> str:
+    if not annotations:
+        return 'No binding-region map is available yet for this page.'
+    if mode == 'annotated':
+        return 'Highlighted bands represent stored binding-site annotations tied to the current target-binder relationships.'
+    return 'Highlighted bands are conceptual interaction zones inferred from current target-binder links. They improve the visual story without claiming residue-level experimental certainty.'
 
 
 def detect_query_intent(query: str) -> str:
@@ -1218,12 +1637,13 @@ def api_search():
         return jsonify({"error": "Missing search query"}), 400
 
     try:
-        route_decision = decide_search_route(
+        search_payload = execute_search(
             query,
             binder_type=binder_type,
             clinical_status=clinical_status,
-            disease_name=disease_name
+            disease_name=disease_name,
         )
+        route_decision = search_payload["route_decision"]
 
         if route_decision["mode"] == "redirect":
             return jsonify({
@@ -1232,32 +1652,16 @@ def api_search():
                 "values": route_decision["values"]
             })
 
-        effective_query = route_decision["effective_query"]
-        disease_name = route_decision["auto_disease_name"]
-
-        results = search_database(
-            effective_query,
-            binder_type=binder_type,
-            clinical_status=clinical_status,
-            disease_name=disease_name
-        )
-        summary = build_free_summary(
-            query,
-            results,
-            binder_type=binder_type,
-            clinical_status=clinical_status,
-            disease_name=disease_name
-        )
-
         return jsonify({
             "redirect": False,
             "route_hint": route_decision["route_hint"],
-            "effective_query": effective_query,
-            "summary": summary,
-            "results": results
+            "effective_query": search_payload["effective_query"],
+            "summary": search_payload["summary"],
+            "results": search_payload["results"]
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/protein/<int:protein_id>")
@@ -1280,16 +1684,11 @@ def protein_detail(protein_id):
                 WHERE p.protein_id = %s;
             """, (protein_id,))
             protein = cur.fetchone()
-
             if not protein:
                 return "Protein not found", 404
 
             cur.execute("""
-                SELECT
-                    d.disease_id,
-                    d.disease_name,
-                    d.disease_category,
-                    pd.tag_reason
+                SELECT d.disease_id,d.disease_name,d.disease_category,pd.tag_reason
                 FROM protein_diseases pd
                 JOIN diseases d ON pd.disease_id = d.disease_id
                 WHERE pd.protein_id = %s
@@ -1325,13 +1724,7 @@ def protein_detail(protein_id):
             binders = cur.fetchall()
 
             cur.execute("""
-                SELECT
-                    ct.trial_id,
-                    ct.nct_id,
-                    ct.trial_title,
-                    ct.phase,
-                    ct.recruitment_status,
-                    ct.condition_name
+                SELECT ct.trial_id,ct.nct_id,ct.trial_title,ct.phase,ct.recruitment_status,ct.condition_name
                 FROM protein_trials pt
                 JOIN clinical_trials ct ON pt.trial_id = ct.trial_id
                 WHERE pt.protein_id = %s
@@ -1340,12 +1733,7 @@ def protein_detail(protein_id):
             trials = cur.fetchall()
 
             cur.execute("""
-                SELECT
-                    s.structure_id,
-                    s.pdb_id,
-                    s.structure_title,
-                    s.experimental_method,
-                    s.resolution
+                SELECT s.structure_id,s.pdb_id,s.structure_title,s.experimental_method,s.resolution
                 FROM protein_structures ps
                 JOIN structures s ON ps.structure_id = s.structure_id
                 WHERE ps.protein_id = %s
@@ -1353,18 +1741,14 @@ def protein_detail(protein_id):
             """, (protein_id,))
             structures = cur.fetchall()
 
+            binding_site_annotations, binding_site_mode = load_binding_annotations_for_protein(cur, protein, binders)
+
     binders = decorate_binder_records(binders)
     binder_type_breakdown = summarize_binder_classes(binders)
-    binder_status_breakdown = summarize_counter(
-        Counter((b.get("clinical_status") or b.get("approval_status") or "Unknown") for b in binders)
-    )
-
-    structure_candidates = build_structure_candidates(
-        structures,
-        fallback_uniprot=protein.get("uniprot_accession"),
-        fallback_title=protein.get("protein_name")
-    )
+    binder_status_breakdown = summarize_counter(Counter((b.get("clinical_status") or b.get("approval_status") or "Unknown") for b in binders))
+    structure_candidates = build_structure_candidates(structures, fallback_uniprot=protein.get("uniprot_accession"), fallback_title=protein.get("protein_name"))
     default_structure = structure_candidates[0] if structure_candidates else None
+    binding_region_summary = build_binding_region_summary(binding_site_annotations, binding_site_mode)
 
     return render_template(
         "protein_detail.html",
@@ -1376,8 +1760,12 @@ def protein_detail(protein_id):
         binder_type_breakdown=binder_type_breakdown,
         binder_status_breakdown=binder_status_breakdown,
         structure_candidates=structure_candidates,
-        default_structure=default_structure
+        default_structure=default_structure,
+        binding_site_annotations=binding_site_annotations,
+        binding_site_mode=binding_site_mode,
+        binding_region_summary=binding_region_summary,
     )
+
 
 
 @app.route("/binder/<int:binder_id>")
@@ -1386,63 +1774,34 @@ def binder_detail(binder_id):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT
-                    b.binder_id,
-                    b.binder_name,
-                    b.binder_type,
-                    b.sequence,
-                    b.clinical_status,
-                    b.binder_description,
-                    b.mechanism_of_action,
-                    b.approval_status,
-                    b.developer_company,
-                    bm.modality_name
+                    b.binder_id,b.binder_name,b.binder_type,b.sequence,b.clinical_status,b.binder_description,
+                    b.mechanism_of_action,b.approval_status,b.developer_company,bm.modality_name
                 FROM binders b
                 LEFT JOIN binder_modalities bm ON b.modality_id = bm.modality_id
                 WHERE b.binder_id = %s;
             """, (binder_id,))
             binder = cur.fetchone()
-
             if not binder:
                 return "Binder not found", 404
-
             binder = decorate_binder_record(binder)
 
             cur.execute("""
                 SELECT
-                    p.protein_id,
-                    p.protein_name,
-                    p.uniprot_accession,
-                    g.gene_symbol,
-                    g.gene_name,
-                    p.functional_description,
-                    pb.interaction_type,
+                    p.protein_id,p.protein_name,p.uniprot_accession,p.sequence_length,
+                    g.gene_symbol,g.gene_name,p.functional_description,pb.interaction_type,
                     COUNT(DISTINCT pt.trial_id) AS linked_trial_count
                 FROM protein_binders pb
                 JOIN proteins p ON pb.protein_id = p.protein_id
                 LEFT JOIN genes g ON p.gene_id = g.gene_id
                 LEFT JOIN protein_trials pt ON pt.protein_id = p.protein_id
                 WHERE pb.binder_id = %s
-                GROUP BY
-                    p.protein_id,
-                    p.protein_name,
-                    p.uniprot_accession,
-                    g.gene_symbol,
-                    g.gene_name,
-                    p.functional_description,
-                    pb.interaction_type
+                GROUP BY p.protein_id,p.protein_name,p.uniprot_accession,p.sequence_length,g.gene_symbol,g.gene_name,p.functional_description,pb.interaction_type
                 ORDER BY p.protein_name;
             """, (binder_id,))
             proteins = cur.fetchall()
 
             cur.execute("""
-                SELECT
-                    ct.trial_id,
-                    ct.nct_id,
-                    ct.trial_title,
-                    ct.phase,
-                    ct.recruitment_status,
-                    ct.condition_name,
-                    ct.sponsor_name
+                SELECT ct.trial_id,ct.nct_id,ct.trial_title,ct.phase,ct.recruitment_status,ct.condition_name,ct.sponsor_name
                 FROM binder_trials bt
                 JOIN clinical_trials ct ON bt.trial_id = ct.trial_id
                 WHERE bt.binder_id = %s
@@ -1459,12 +1818,7 @@ def binder_detail(binder_id):
             trials = cur.fetchall()
 
             cur.execute("""
-                SELECT
-                    s.structure_id,
-                    s.pdb_id,
-                    s.structure_title,
-                    s.experimental_method,
-                    s.resolution
+                SELECT s.structure_id,s.pdb_id,s.structure_title,s.experimental_method,s.resolution
                 FROM binder_structures bs
                 JOIN structures s ON bs.structure_id = s.structure_id
                 WHERE bs.binder_id = %s
@@ -1473,11 +1827,7 @@ def binder_detail(binder_id):
             structures = cur.fetchall()
 
             cur.execute("""
-                SELECT
-                    d.disease_id,
-                    d.disease_name,
-                    d.disease_category,
-                    bd.tag_reason
+                SELECT d.disease_id,d.disease_name,d.disease_category,bd.tag_reason
                 FROM binder_diseases bd
                 JOIN diseases d ON bd.disease_id = d.disease_id
                 WHERE bd.binder_id = %s
@@ -1486,12 +1836,7 @@ def binder_detail(binder_id):
             diseases = cur.fetchall()
 
             cur.execute("""
-                SELECT DISTINCT
-                    b2.binder_id,
-                    b2.binder_name,
-                    b2.binder_type,
-                    b2.clinical_status,
-                    bm2.modality_name
+                SELECT DISTINCT b2.binder_id,b2.binder_name,b2.binder_type,b2.clinical_status,bm2.modality_name
                 FROM binders b2
                 LEFT JOIN binder_modalities bm2 ON b2.modality_id = bm2.modality_id
                 WHERE b2.binder_id <> %s
@@ -1500,15 +1845,13 @@ def binder_detail(binder_id):
                         SELECT 1
                         FROM protein_binders pb1
                         JOIN protein_binders pb2 ON pb1.protein_id = pb2.protein_id
-                        WHERE pb1.binder_id = %s
-                          AND pb2.binder_id = b2.binder_id
+                        WHERE pb1.binder_id = %s AND pb2.binder_id = b2.binder_id
                     )
                     OR EXISTS (
                         SELECT 1
                         FROM binder_diseases bd1
                         JOIN binder_diseases bd2 ON bd1.disease_id = bd2.disease_id
-                        WHERE bd1.binder_id = %s
-                          AND bd2.binder_id = b2.binder_id
+                        WHERE bd1.binder_id = %s AND bd2.binder_id = b2.binder_id
                     )
                   )
                 ORDER BY b2.binder_name
@@ -1517,16 +1860,7 @@ def binder_detail(binder_id):
             related_binders = cur.fetchall()
 
             cur.execute("""
-                SELECT DISTINCT
-                    p.protein_id,
-                    p.protein_name,
-                    p.uniprot_accession,
-                    g.gene_symbol,
-                    s.structure_id,
-                    s.pdb_id,
-                    s.structure_title,
-                    s.experimental_method,
-                    s.resolution
+                SELECT DISTINCT p.protein_id,p.protein_name,p.uniprot_accession,g.gene_symbol,s.structure_id,s.pdb_id,s.structure_title,s.experimental_method,s.resolution
                 FROM protein_binders pb
                 JOIN proteins p ON pb.protein_id = p.protein_id
                 LEFT JOIN genes g ON p.gene_id = g.gene_id
@@ -1537,86 +1871,66 @@ def binder_detail(binder_id):
             """, (binder_id,))
             target_structures = cur.fetchall()
 
-    target_count = len(proteins)
-    trial_count = len(trials)
-    disease_count = len(diseases)
-    structure_count = len(structures)
-    sequence_length = len((binder.get("sequence") or "").replace("\n", "").replace(" ", "")) if binder.get("sequence") else 0
+            binder_binding_maps, binder_binding_mode = build_binder_binding_maps(cur, binder, proteins)
 
+    target_count=len(proteins); trial_count=len(trials); disease_count=len(diseases); structure_count=len(structures)
+    sequence_length=len((binder.get("sequence") or "").replace("\n", "").replace(" ", "")) if binder.get("sequence") else 0
     related_binders = decorate_binder_records(related_binders)
+    trial_phase_breakdown = summarize_counter(Counter((t.get("phase") or "Unknown") for t in trials))
+    disease_category_breakdown = summarize_counter(Counter((d.get("disease_category") or "Uncategorized") for d in diseases))
 
-    trial_phase_breakdown = summarize_counter(
-        Counter((t.get("phase") or "Unknown") for t in trials)
-    )
-    disease_category_breakdown = summarize_counter(
-        Counter((d.get("disease_category") or "Uncategorized") for d in diseases)
-    )
-    binder_classification = {
-        "binder_type": binder.get("binder_type") or "Other",
-        "class_family": binder.get("binder_class_family") or "Unresolved / other",
-        "is_primary": binder.get("is_primary_binder_class", False)
-    }
-
-    binder_story_parts = []
-    binder_story_parts.append(
-        f'{binder.get("binder_name", "This binder")} is currently classified as '
-        f'{binder.get("binder_type") or "an unclassified binder"}.'
-    )
-    binder_story_parts.append(
-        f'It is linked to {target_count} target{"s" if target_count != 1 else ""}, '
-        f'{trial_count} clinical trial{"s" if trial_count != 1 else ""}, '
-        f'{disease_count} disease tag{"s" if disease_count != 1 else ""}, and '
-        f'{structure_count} directly linked structure{"s" if structure_count != 1 else ""}.'
-    )
+    binder_story_parts = [
+        f'{binder.get("binder_name", "This binder")} is currently classified as {binder.get("binder_type") or "an unclassified binder"}.',
+        f'It is linked to {target_count} target{"s" if target_count != 1 else ""}, {trial_count} clinical trial{"s" if trial_count != 1 else ""}, {disease_count} disease tag{"s" if disease_count != 1 else ""}, and {structure_count} directly linked structure{"s" if structure_count != 1 else ""}.',
+    ]
     if binder.get("clinical_status") or binder.get("approval_status"):
-        binder_story_parts.append(
-            f'Clinical status: {binder.get("clinical_status") or binder.get("approval_status")}.'
-        )
+        binder_story_parts.append(f'Clinical status: {binder.get("clinical_status") or binder.get("approval_status")}.')
     if proteins:
         protein_names = ", ".join([(p.get("gene_symbol") or p.get("protein_name") or "Unknown target") for p in proteins[:3]])
         binder_story_parts.append(f'Primary linked targets include {protein_names}.')
     binder_story = " ".join(binder_story_parts)
 
-    target_structure_candidates = []
+    target_structure_candidates=[]
     for row in target_structures:
-        pdb_id = safe_string(row.get("pdb_id"))
+        pdb_id=safe_string(row.get("pdb_id"))
         if not pdb_id:
             continue
-
-        gene_or_name = safe_string(row.get("gene_symbol")) or safe_string(row.get("protein_name")) or "Target"
-        method = safe_string(row.get("experimental_method")) or "Experimental structure"
-        resolution = row.get("resolution")
-        resolution_text = f" · Resolution: {resolution}" if resolution is not None else ""
-
+        gene_or_name=safe_string(row.get("gene_symbol")) or safe_string(row.get("protein_name")) or "Target"
+        method=safe_string(row.get("experimental_method")) or "Experimental structure"
+        resolution=row.get("resolution")
+        resolution_text=f" · Resolution: {resolution}" if resolution is not None else ""
         target_structure_candidates.append({
-            "source_type": "pdb",
-            "source_id": pdb_id.upper(),
-            "label": f"{gene_or_name} · PDB {pdb_id.upper()}",
-            "title": safe_string(row.get("structure_title")) or f"{gene_or_name} structure",
-            "subtitle": f"{method}{resolution_text}",
-            "viewer_url": build_molstar_pdb_viewer_url(pdb_id),
-            "external_url": f"https://www.rcsb.org/structure/{pdb_id.upper()}",
-            "origin": f"Target-linked structure ({gene_or_name})"
+            "source_type":"pdb","source_id":pdb_id.upper(),"label":f"{gene_or_name} · PDB {pdb_id.upper()}",
+            "title":safe_string(row.get("structure_title")) or f"{gene_or_name} structure",
+            "subtitle":f"{method}{resolution_text}","viewer_url":build_molstar_pdb_viewer_url(pdb_id),
+            "external_url":f"https://www.rcsb.org/structure/{pdb_id.upper()}","origin":f"Target-linked structure ({gene_or_name})"
         })
-
-    fallback_uniprot = None
-    fallback_title = None
+    fallback_uniprot=None; fallback_title=None
     if proteins:
-        first_target = proteins[0]
-        fallback_uniprot = first_target.get("uniprot_accession")
-        fallback_title = first_target.get("protein_name")
-
-    direct_candidates = build_structure_candidates(structures)
-    structure_candidates = dedupe_structure_candidates(direct_candidates + target_structure_candidates)
-
+        first_target=proteins[0]; fallback_uniprot=first_target.get("uniprot_accession"); fallback_title=first_target.get("protein_name")
+    direct_candidates=build_structure_candidates(structures)
+    structure_candidates=dedupe_structure_candidates(direct_candidates + target_structure_candidates)
     if not structure_candidates and fallback_uniprot:
-        structure_candidates = build_structure_candidates(
-            [],
-            fallback_uniprot=fallback_uniprot,
-            fallback_title=fallback_title
-        )
-
-    default_structure = structure_candidates[0] if structure_candidates else None
+        structure_candidates = build_structure_candidates([], fallback_uniprot=fallback_uniprot, fallback_title=fallback_title)
+    default_structure=structure_candidates[0] if structure_candidates else None
+    binding_region_summary = build_binding_region_summary(
+        [ann for mapping in binder_binding_maps for ann in mapping.get('annotations', [])],
+        binder_binding_mode,
+    )
+    binder_classification = build_binder_classification(
+        binder,
+        proteins=proteins,
+        trials=trials,
+        diseases=diseases,
+        structures=structures,
+    )
+    binder_visualization = build_binder_visualization(
+        binder,
+        proteins=proteins,
+        diseases=diseases,
+        trials=trials,
+        related_binders=related_binders,
+    )
 
     return render_template(
         "binder_detail.html",
@@ -1635,7 +1949,12 @@ def binder_detail(binder_id):
         disease_category_breakdown=disease_category_breakdown,
         binder_story=binder_story,
         structure_candidates=structure_candidates,
-        default_structure=default_structure
+        default_structure=default_structure,
+        binder_binding_maps=binder_binding_maps,
+        binder_binding_mode=binder_binding_mode,
+        binding_region_summary=binding_region_summary,
+        binder_classification=binder_classification,
+        binder_visualization=binder_visualization,
     )
 
 

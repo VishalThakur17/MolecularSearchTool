@@ -349,7 +349,7 @@
         <div class="hero">
             <h1>{{ protein.gene_symbol or protein.protein_name }}</h1>
             <p class="subtitle">
-                This target page keeps the therapeutic layer visible while also letting the user inspect a linked 3D structure or fallback model directly inside the application.
+                This target page keeps the therapeutic layer visible while also letting the user inspect linked binders, disease tags, clinical evidence, and a 3D structure or fallback model directly inside the application.
             </p>
             <div class="badge-row">
                 <span class="badge">UniProt: {{ protein.uniprot_accession or 'Not available' }}</span>
@@ -363,7 +363,7 @@
         <div class="card">
             <h2>3D Structure Viewer</h2>
             <p class="section-intro">
-                Choose an experimentally linked structure when available. If the protein has no linked PDB structure but does have a UniProt accession, the page falls back to a predicted model.
+                Choose an experimentally linked structure when available. If the protein has no linked PDB structure but does have a UniProt accession, the page falls back to a predicted model. This keeps visual structure exploration available as part of the beta workflow.
             </p>
 
             {% if structure_candidates and default_structure %}
@@ -455,6 +455,7 @@
 
                 <div class="card">
                     <h2>Associated Disease Tags</h2>
+                    <p class="section-intro">Disease remains a contextual tagging layer on the target page so users can move from target biology to disease context without making disease the primary organizing pillar.</p>
                     {% if diseases and diseases|length > 0 %}
                         <div class="tag-list">
                             {% for disease in diseases %}
@@ -479,6 +480,7 @@
             <div class="stack">
                 <div class="card">
                     <h2>Binder Landscape for This Target</h2>
+                    <p class="section-intro">The target view summarizes binder classification and development state so the user can quickly see what therapeutic landscape surrounds this protein.</p>
                     <div class="breakdown-grid">
                         <div class="breakdown-box">
                             <h3 style="margin-top:0;">By Binder Type</h3>
