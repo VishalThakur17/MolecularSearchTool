@@ -1,3 +1,4 @@
+import re
 import requests
 from ingest.db import get_connection
 
@@ -5,11 +6,14 @@ CHEMBL_MECHANISM_URL = "https://www.ebi.ac.uk/chembl/api/data/mechanism.json"
 CHEMBL_MOLECULE_URL = "https://www.ebi.ac.uk/chembl/api/data/molecule"
 CHEMBL_TARGET_URL = "https://www.ebi.ac.uk/chembl/api/data/target.json"
 
+# Standard amino-acid alphabet plus common ambiguous letters
+VALID_AA_CHARS = set("ACDEFGHIKLMNPQRSTVWYBXZJUO")
+
 
 def fetch_target_chembl_ids_for_gene(gene_symbol: str, limit: int = 10):
     """
     Find ChEMBL target IDs associated with a gene symbol.
-    Uses a supported synonym filter instead of the invalid nested filter path.
+    Uses a synonym filter and keeps single-protein targets when possible.
     """
     params = {
         "target_synonym__icontains": gene_symbol,
@@ -29,7 +33,6 @@ def fetch_target_chembl_ids_for_gene(gene_symbol: str, limit: int = 10):
         if not tid or tid in seen:
             continue
 
-        # Optional quality filter: keep only single protein targets when possible
         target_type = (target.get("target_type") or "").lower()
         if target_type and "single protein" not in target_type:
             continue
@@ -53,6 +56,9 @@ def fetch_mechanisms_for_target_chembl_id(target_chembl_id: str, limit: int = 25
 
 
 def fetch_molecule_details(chembl_molecule_id: str):
+    """
+    Fetch a full ChEMBL molecule record.
+    """
     url = f"{CHEMBL_MOLECULE_URL}/{chembl_molecule_id}.json"
     response = requests.get(url, timeout=45)
     response.raise_for_status()
@@ -91,7 +97,7 @@ def infer_binder_type(molecule_record: dict) -> str:
     """
     molecule_type = (molecule_record.get("molecule_type") or "").lower().strip()
     pref_name = (molecule_record.get("pref_name") or "").lower().strip()
-    sequence = (molecule_record.get("sequence") or "").strip()
+    sequence = (extract_sequence(molecule_record) or "").strip()
 
     # --- VHH / Nanobody ---
     if any(term in molecule_type for term in ["nanobody", "vhh", "single domain antibody"]):
@@ -109,18 +115,21 @@ def infer_binder_type(molecule_record: dict) -> str:
     if "peptide" in molecule_type or "oligopeptide" in molecule_type:
         return "Peptide"
     if sequence:
-        seq_len = len(sequence.replace("\n", "").replace(" ", ""))
+        seq_len = len(sequence)
         if 2 <= seq_len <= 80:
             return "Peptide"
 
     # --- Small molecule ---
     if molecule_type in ["small molecule", "synthetic small molecule", ""]:
-        # empty string often happens for small-molecule style records from noisy sources
         if pref_name and not pref_name.endswith("mab"):
             return "Small Molecule"
 
-    # fallback pattern-based small-molecule hint
-    if molecule_type and "molecule" in molecule_type and "antibody" not in molecule_type and "peptide" not in molecule_type:
+    if (
+        molecule_type
+        and "molecule" in molecule_type
+        and "antibody" not in molecule_type
+        and "peptide" not in molecule_type
+    ):
         return "Small Molecule"
 
     return "Other"
@@ -143,11 +152,118 @@ def infer_clinical_status(molecule_record: dict) -> str | None:
     return phase_map.get(max_phase, f"Max Phase {max_phase}")
 
 
+def _clean_sequence(raw_value) -> str | None:
+    """
+    Normalize a candidate amino-acid sequence:
+    - convert to string
+    - remove whitespace and punctuation
+    - uppercase
+    - validate against amino-acid alphabet
+    """
+    if raw_value is None:
+        return None
+
+    seq = str(raw_value).strip().upper()
+    if not seq:
+        return None
+
+    # remove spaces/newlines and common separators
+    seq = re.sub(r"[\s\-_*.:;,\|/\\]+", "", seq)
+
+    if len(seq) < 5:
+        return None
+
+    if not set(seq).issubset(VALID_AA_CHARS):
+        return None
+
+    return seq
+
+
+def _collect_candidate_sequences(value, candidates: list[str]):
+    """
+    Recursively scan nested dict/list structures and collect possible sequence strings.
+    This is intentionally permissive because ChEMBL biologic records can vary in shape.
+    """
+    if value is None:
+        return
+
+    if isinstance(value, str):
+        cleaned = _clean_sequence(value)
+        if cleaned:
+            candidates.append(cleaned)
+        return
+
+    if isinstance(value, list):
+        for item in value:
+            _collect_candidate_sequences(item, candidates)
+        return
+
+    if isinstance(value, dict):
+        # Prefer commonly used field names first
+        preferred_keys = [
+            "sequence",
+            "full_sequence",
+            "sequence_text",
+            "protein_sequence",
+            "peptide_sequence",
+            "chain_sequence",
+            "component_sequence",
+        ]
+
+        for key in preferred_keys:
+            if key in value:
+                _collect_candidate_sequences(value.get(key), candidates)
+
+        # Then recursively inspect nested objects
+        for nested_value in value.values():
+            if isinstance(nested_value, (dict, list)):
+                _collect_candidate_sequences(nested_value, candidates)
+
+
 def extract_sequence(molecule_record: dict) -> str | None:
-    sequence = molecule_record.get("sequence")
-    if sequence:
-        return sequence.strip()
-    return None
+    """
+    Attempt to extract a real amino-acid sequence from a ChEMBL molecule record.
+
+    Strategy:
+    1. Look at obvious top-level fields
+    2. Look at common nested biologic/component fields
+    3. Recursively scan nested structures for likely amino-acid sequences
+    4. Return the longest valid sequence found
+    """
+    candidates: list[str] = []
+
+    # Common top-level checks
+    top_level_fields = [
+        molecule_record.get("sequence"),
+        molecule_record.get("full_sequence"),
+        molecule_record.get("protein_sequence"),
+        molecule_record.get("peptide_sequence"),
+    ]
+    for value in top_level_fields:
+        cleaned = _clean_sequence(value)
+        if cleaned:
+            candidates.append(cleaned)
+
+    # Common nested sections that may hold biologic sequence content
+    nested_sections = [
+        molecule_record.get("molecule_properties"),
+        molecule_record.get("molecule_structures"),
+        molecule_record.get("molecule_hierarchy"),
+        molecule_record.get("biotherapeutic"),
+        molecule_record.get("biotherapeutic_properties"),
+        molecule_record.get("molecule_components"),
+        molecule_record.get("cross_references"),
+    ]
+    for section in nested_sections:
+        _collect_candidate_sequences(section, candidates)
+
+    if not candidates:
+        return None
+
+    # Store the longest valid sequence found.
+    # This is a practical choice for similarity search if multiple chains exist.
+    best = max(candidates, key=len)
+    return best
 
 
 def upsert_source(cur, source_name: str, source_url: str):
@@ -214,9 +330,9 @@ def upsert_binder(cur, molecule: dict, gene_symbol: str, source_id: int, mechani
     modality_name = infer_modality(molecule)
     modality_id = get_or_create_modality(cur, modality_name)
 
+    sequence = extract_sequence(molecule)
     binder_type = infer_binder_type(molecule)
     clinical_status = infer_clinical_status(molecule)
-    sequence = extract_sequence(molecule)
 
     max_phase = molecule.get("max_phase")
     approval_status = f"Max Phase {max_phase}" if max_phase is not None else None
@@ -311,10 +427,11 @@ def link_binder_to_protein(cur, protein_id: int, binder_id: int, action_type: st
 
 def upsert_binders_for_gene(gene_symbol: str, limit_per_target: int = 20):
     """
-    Main ingestion function for Priority 1:
+    Main ingestion function:
     - find ChEMBL targets for a gene symbol
     - fetch mechanisms for those targets
-    - insert binders
+    - fetch molecule records
+    - insert / update binders
     - create protein_binders links
     """
     with get_connection() as conn:
@@ -334,6 +451,7 @@ def upsert_binders_for_gene(gene_symbol: str, limit_per_target: int = 20):
             total_mechanisms = 0
             inserted_binders = 0
             linked_pairs = 0
+            sequences_found = 0
 
             seen_molecule_ids = set()
 
@@ -361,6 +479,9 @@ def upsert_binders_for_gene(gene_symbol: str, limit_per_target: int = 20):
                     except Exception as e:
                         print(f"[Binders] Failed molecule fetch for {molecule_chembl_id}: {e}")
                         continue
+
+                    if extract_sequence(molecule):
+                        sequences_found += 1
 
                     binder_id = upsert_binder(
                         cur,
@@ -396,5 +517,6 @@ def upsert_binders_for_gene(gene_symbol: str, limit_per_target: int = 20):
         f"Targets found={len(target_chembl_ids)} | "
         f"Mechanisms read={total_mechanisms} | "
         f"Binders upserted={inserted_binders} | "
-        f"New protein-binder links={linked_pairs}"
+        f"New protein-binder links={linked_pairs} | "
+        f"Molecules with extracted sequence={sequences_found}"
     )
