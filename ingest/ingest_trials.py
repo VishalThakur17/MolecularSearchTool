@@ -4,17 +4,31 @@ from ingest.db import get_connection
 CTGOV_V2_URL = "https://clinicaltrials.gov/api/v2/studies"
 
 
-def fetch_trials(term: str, page_size: int = 10):
-    params = {
-        "query.term": term,
-        "pageSize": page_size,
-        "format": "json",
-    }
+def fetch_trials(term: str, page_size: int = 25, max_pages: int = 3):
+    studies = []
+    page_token = None
 
-    response = requests.get(CTGOV_V2_URL, params=params, timeout=45)
-    response.raise_for_status()
-    data = response.json()
-    return data.get("studies", [])
+    for _ in range(max_pages):
+        params = {
+            "query.term": term,
+            "pageSize": page_size,
+            "format": "json",
+        }
+
+        if page_token:
+            params["pageToken"] = page_token
+
+        response = requests.get(CTGOV_V2_URL, params=params, timeout=45)
+        response.raise_for_status()
+        data = response.json()
+
+        studies.extend(data.get("studies", []))
+        page_token = data.get("nextPageToken")
+
+        if not page_token:
+            break
+
+    return studies
 
 
 def upsert_source(cur, source_name: str, source_url: str):
@@ -78,29 +92,16 @@ def first_list_value(value, default=None):
 
 
 def normalize_ctgov_date(date_str):
-    """
-    Convert ClinicalTrials.gov partial dates into PostgreSQL-safe YYYY-MM-DD dates.
-
-    Examples:
-    - 2036-11    -> 2036-11-01
-    - 2027       -> 2027-01-01
-    - 2025-08-03 -> 2025-08-03
-    """
     if not date_str:
         return None
 
     date_str = str(date_str).strip()
 
     if len(date_str) == 10:
-        # Already YYYY-MM-DD
         return date_str
-
     if len(date_str) == 7:
-        # YYYY-MM
         return f"{date_str}-01"
-
     if len(date_str) == 4:
-        # YYYY
         return f"{date_str}-01-01"
 
     return None
@@ -149,9 +150,20 @@ def extract_trial_fields(study: dict):
     }
 
 
-def upsert_trials_for_target(gene_symbol: str, disease_name: str, max_trials: int = 10):
+def upsert_trials_for_target(
+    gene_symbol: str,
+    disease_name: str,
+    max_trials: int = 50,
+    max_pages: int = 3,
+):
     search_term = f'{gene_symbol} AND "{disease_name}"'
-    studies = fetch_trials(search_term, page_size=max_trials)
+    studies = fetch_trials(
+        search_term,
+        page_size=min(max_trials, 25),
+        max_pages=max_pages,
+    )
+
+    seen_nct_ids = set()
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -182,6 +194,10 @@ def upsert_trials_for_target(gene_symbol: str, disease_name: str, max_trials: in
 
                 if not fields["nct_id"] or not fields["trial_title"]:
                     continue
+
+                if fields["nct_id"] in seen_nct_ids:
+                    continue
+                seen_nct_ids.add(fields["nct_id"])
 
                 cur.execute(
                     """
@@ -241,6 +257,100 @@ def upsert_trials_for_target(gene_symbol: str, disease_name: str, max_trials: in
                     (disease_id, trial_id),
                 )
 
+                # Support either name if both tables exist in your DB history
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO trial_diseases (trial_id, disease_id)
+                        VALUES (%s, %s)
+                        ON CONFLICT (trial_id, disease_id) DO NOTHING;
+                        """,
+                        (trial_id, disease_id),
+                    )
+                except Exception:
+                    conn.rollback()
+                    with conn.cursor() as retry_cur:
+                        source_id = upsert_source(
+                            retry_cur,
+                            "ClinicalTrials.gov",
+                            "https://clinicaltrials.gov",
+                        )
+                        disease_id = get_or_create_disease(retry_cur, disease_name)
+
+                        retry_cur.execute(
+                            """
+                            INSERT INTO clinical_trials (
+                                nct_id,
+                                trial_title,
+                                condition_name,
+                                phase,
+                                recruitment_status,
+                                study_type,
+                                sponsor_name,
+                                brief_summary,
+                                trial_url,
+                                start_date,
+                                completion_date,
+                                source_id
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (nct_id)
+                            DO UPDATE SET
+                                trial_title = EXCLUDED.trial_title,
+                                condition_name = EXCLUDED.condition_name,
+                                phase = EXCLUDED.phase,
+                                recruitment_status = EXCLUDED.recruitment_status,
+                                study_type = EXCLUDED.study_type,
+                                sponsor_name = EXCLUDED.sponsor_name,
+                                brief_summary = EXCLUDED.brief_summary,
+                                trial_url = EXCLUDED.trial_url,
+                                start_date = EXCLUDED.start_date,
+                                completion_date = EXCLUDED.completion_date,
+                                source_id = EXCLUDED.source_id
+                            RETURNING trial_id;
+                            """,
+                            (
+                                fields["nct_id"],
+                                fields["trial_title"],
+                                fields["condition_name"],
+                                fields["phase"],
+                                fields["recruitment_status"],
+                                fields["study_type"],
+                                fields["sponsor_name"],
+                                fields["brief_summary"],
+                                fields["trial_url"],
+                                fields["start_date"],
+                                fields["completion_date"],
+                                source_id,
+                            ),
+                        )
+                        trial_id = retry_cur.fetchone()[0]
+
+                        retry_cur.execute(
+                            """
+                            INSERT INTO disease_trials (disease_id, trial_id)
+                            VALUES (%s, %s)
+                            ON CONFLICT (disease_id, trial_id) DO NOTHING;
+                            """,
+                            (disease_id, trial_id),
+                        )
+
+                        if protein_id:
+                            retry_cur.execute(
+                                """
+                                INSERT INTO protein_trials (protein_id, trial_id, evidence_summary)
+                                VALUES (%s, %s, %s)
+                                ON CONFLICT (protein_id, trial_id)
+                                DO NOTHING;
+                                """,
+                                (
+                                    protein_id,
+                                    trial_id,
+                                    f"Linked by ingestion query for {gene_symbol} and {disease_name}",
+                                ),
+                            )
+                        conn.commit()
+
                 if protein_id:
                     cur.execute(
                         """
@@ -257,5 +367,7 @@ def upsert_trials_for_target(gene_symbol: str, disease_name: str, max_trials: in
                     )
 
                 inserted += 1
+
+            conn.commit()
 
     print(f"[Trials] Upserted {inserted} trials for {gene_symbol} / {disease_name}")
