@@ -1913,8 +1913,14 @@ def binder_detail(binder_id):
     if not structure_candidates and fallback_uniprot:
         structure_candidates = build_structure_candidates([], fallback_uniprot=fallback_uniprot, fallback_title=fallback_title)
     default_structure=structure_candidates[0] if structure_candidates else None
+    binder_3d_annotations = [
+    ann
+    for mapping in binder_binding_maps
+    for ann in mapping.get("annotations", [])
+    ]
+
     binding_region_summary = build_binding_region_summary(
-        [ann for mapping in binder_binding_maps for ann in mapping.get('annotations', [])],
+        binder_3d_annotations,
         binder_binding_mode,
     )
     binder_classification = build_binder_classification(
@@ -1955,6 +1961,7 @@ def binder_detail(binder_id):
         binding_region_summary=binding_region_summary,
         binder_classification=binder_classification,
         binder_visualization=binder_visualization,
+        binder_3d_annotations=binder_3d_annotations,
     )
 
 

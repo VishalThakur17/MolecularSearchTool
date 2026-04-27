@@ -465,6 +465,9 @@
             text-decoration: underline;
         }
 
+        .binding-map-card{background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:14px}.binding-map-header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px}.binding-map-header h3{margin:0;font-size:1.05rem;color:var(--navy)}.binding-map-header p{margin:6px 0 0;color:var(--muted);line-height:1.5}.map-mode-badge{flex:0 0 auto;padding:7px 10px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.protein-ruler{position:relative;height:84px;border-radius:16px;background:linear-gradient(90deg,#e2e8f0,#f8fafc);border:1px solid #cbd5e1;overflow:hidden;margin:14px 0}.protein-ruler:before{content:"N";position:absolute;left:12px;top:10px;font-size:.75rem;font-weight:800;color:#475569}.protein-ruler:after{content:"C";position:absolute;right:12px;top:10px;font-size:.75rem;font-weight:800;color:#475569}.protein-axis{position:absolute;left:18px;right:18px;top:38px;height:10px;border-radius:999px;background:#94a3b8}.binding-segment{position:absolute;left:var(--left);width:var(--width);top:28px;height:30px;min-width:14px;border-radius:999px;background:var(--segment-color,#dc2626);box-shadow:0 8px 20px rgba(220,38,38,.24);border:2px solid rgba(255,255,255,.84)}.binding-label{position:absolute;left:var(--center);top:61px;transform:translateX(-50%);background:white;border:1px solid #cbd5e1;color:#334155;border-radius:999px;padding:4px 8px;font-size:.72rem;font-weight:800;white-space:nowrap;box-shadow:0 6px 14px rgba(15,23,42,.08)}.annotation-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:12px}.annotation-item{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:12px}.annotation-topline{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--navy);margin-bottom:6px}.annotation-dot{width:11px;height:11px;flex:0 0 11px;border-radius:999px;background:var(--segment-color,#dc2626)}.annotation-item p{margin:4px 0;color:var(--muted);line-height:1.45;font-size:.9rem}
+
+
         @media (max-width: 1100px) {
             .main-grid,
             .viewer-shell,
@@ -485,7 +488,128 @@
                 grid-template-columns: 1fr;
             }
         }
-    </style>
+
+        .viz-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:16px 0 18px}
+        .viz-stat{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+        .viz-stat strong{display:block;font-size:1.35rem;color:#0f172a;margin-bottom:3px}
+        .viz-stat span{font-size:.82rem;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+        .viz-note{border-left:4px solid #dc2626;background:#fff7ed;border-radius:12px;padding:12px 14px;color:#7c2d12;line-height:1.5;margin:12px 0}
+        .viz-breakdowns{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:12px 0}
+        .viz-breakdown-box{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:14px}
+        .viz-breakdown-box h4{margin:0 0 10px;color:#0f172a}
+        .evidence-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;font-size:.78rem;font-weight:800;background:#f1f5f9;color:#334155}
+        .evidence-pill.curated{background:#dcfce7;color:#166534}
+        .evidence-pill.inferred{background:#fee2e2;color:#991b1b}
+        .binding-segment.inferred{opacity:.72;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.35) 0 6px,rgba(255,255,255,.08) 6px 12px)}
+
+    
+        .three-d-card {
+            background: linear-gradient(180deg, #ffffff, #f8fafc);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 20px;
+        }
+
+        .three-d-toolbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: center;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+
+        .three-d-select {
+            min-width: 260px;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: white;
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .three-d-viewer {
+            width: 100%;
+            height: 460px;
+            border: 1px solid #cbd5e1;
+            border-radius: 18px;
+            overflow: hidden;
+            background: white;
+            position: relative;
+            z-index: 1;
+        }
+
+        .three-d-viewer canvas {
+            position: absolute !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+
+        .three-d-status {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        .three-d-status.success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .three-d-status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .three-d-status.loading {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .three-d-annotation-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .three-d-annotation-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .three-d-annotation-row p {
+            margin: 4px 0;
+            color: var(--muted);
+            line-height: 1.45;
+            font-size: 0.9rem;
+        }
+
+        .three-d-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            flex: 0 0 12px;
+            margin-top: 4px;
+        }
+
+        .three-d-source {
+            font-size: 0.82rem !important;
+            color: #64748b !important;
+        }
+</style>
 </head>
 <body>
     <div class="navbar">
@@ -690,6 +814,112 @@
                         </div>
                     </div>
                 </div>
+
+
+                <div class="card">
+                    <h2>Final Binder-Target Binding Visualization</h2>
+                    <p class="section-intro">
+                        This final visualization completes the sponsor request for the binder page: the selected binder is shown against each linked target protein, with the binding region highlighted in red. Curated binding-site rows are used when available; any inferred regions are clearly marked so the page does not pretend placeholder coordinates are experimental data.
+                    </p>
+
+                    {% if binder_map_summary %}
+                        <div class="viz-summary-grid">
+                            <div class="viz-stat"><strong>{{ binder_map_summary.stats.total_mapped_regions }}</strong><span>Mapped regions</span></div>
+                            <div class="viz-stat"><strong>{{ binder_map_summary.stats.curated_region_count }}</strong><span>Curated regions</span></div>
+                            <div class="viz-stat"><strong>{{ binder_map_summary.stats.inferred_region_count }}</strong><span>Inferred regions</span></div>
+                            <div class="viz-stat"><strong>{{ target_count }}</strong><span>Linked targets</span></div>
+                        </div>
+                        <div class="viz-note"><strong>Map status:</strong> {{ binder_map_summary.summary_text }}</div>
+                    {% endif %}
+
+                    {% if binder_binding_maps and binder_binding_maps|length > 0 %}
+                        {% for mapping in binder_binding_maps %}
+                            <div class="binding-map-card">
+                                <div class="binding-map-header">
+                                    <div>
+                                        <h3>{{ mapping.protein_label }}</h3>
+                                        <p>{{ mapping.protein_name }}{% if mapping.uniprot_accession %} · UniProt: {{ mapping.uniprot_accession }}{% endif %}</p>
+                                        <p><strong>Interaction:</strong> {{ mapping.interaction_type or 'Interaction not available' }}</p>
+                                        <p><strong>Sequence length:</strong> {{ mapping.sequence_length or 'Not available' }} residues</p>
+                                    </div>
+                                    <span class="map-mode-badge">{{ binder_binding_mode }}</span>
+                                </div>
+
+                                <div class="protein-ruler" aria-label="Binding map for {{ mapping.protein_label }}">
+                                    <div class="protein-axis"></div>
+                                    {% for ann in mapping.annotations %}
+                                        <div class="binding-segment {% if ann.inferred %}inferred{% endif %}"
+                                             title="{{ ann.region_label }}: {{ ann.region_start }}-{{ ann.region_end }}"
+                                             style="--left: {{ ann.left_percent }}%; --width: {{ ann.width_percent }}%; --segment-color: {{ ann.color_hex }};"></div>
+                                        <div class="binding-label" style="--center: {{ ann.center_percent }}%;">{{ ann.region_start }}–{{ ann.region_end }}</div>
+                                    {% endfor %}
+                                </div>
+
+                                <div class="annotation-list">
+                                    {% for ann in mapping.annotations %}
+                                        <div class="annotation-item">
+                                            <div class="annotation-topline">
+                                                <span class="annotation-dot" style="--segment-color: {{ ann.color_hex }};"></span>
+                                                {{ ann.region_label }}
+                                            </div>
+                                            <p><strong>Residues:</strong> {{ ann.region_start }}–{{ ann.region_end }}</p>
+                                            <p><strong>Evidence:</strong>
+                                                <span class="evidence-pill {% if ann.inferred %}inferred{% else %}curated{% endif %}">
+                                                    {{ ann.evidence_type }}
+                                                </span>
+                                            </p>
+                                            <p><strong>Data confidence:</strong> {{ ann.confidence_label }}</p>
+                                            {% if ann.source_note %}<p>{{ ann.source_note }}</p>{% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="empty">No binder-target map is available because this binder has no linked targets.</p>
+                    {% endif %}
+                </div>
+                <div class="card">
+                    <h2>3D Binder-Target Highlighting</h2>
+                    <p class="section-intro">
+                        This viewer loads a linked target or binder structure and highlights the residue regions connected to this binder.
+                        The highlighted regions match the binding-site annotations used in the 2D visualization.
+                    </p>
+
+                    {% if structure_candidates and structure_candidates|length > 0 and binder_3d_annotations and binder_3d_annotations|length > 0 %}
+                        <div
+                            class="three-d-card"
+                            data-binding-3d-viewer
+                            data-structures='{{ structure_candidates|tojson }}'
+                            data-annotations='{{ binder_3d_annotations|tojson }}'
+                        >
+                            <div class="three-d-toolbar">
+                                <div>
+                                    <strong>Structure source</strong>
+                                    <p style="margin:4px 0 0;color:#64748b;">
+                                        Select a linked PDB structure or fallback AlphaFold model.
+                                    </p>
+                                </div>
+
+                                <select class="three-d-select" data-structure-select></select>
+                            </div>
+
+                            <div class="three-d-viewer" data-structure-viewer></div>
+
+                            <div class="three-d-status loading" data-structure-status>
+                                Preparing 3D structure viewer...
+                            </div>
+
+                            <div class="three-d-annotation-list" data-annotation-list></div>
+                        </div>
+                    {% else %}
+                        <p class="empty">
+                            3D highlighting needs both a structure candidate and binding-site annotations.
+                            The 2D binder-target map is still available.
+                        </p>
+                    {% endif %}
+                </div>
+
 
                 <div class="card">
                     <h2>Current Disease Tag Context</h2>
@@ -897,5 +1127,7 @@
         })();
     </script>
     {% endif %}
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+<script src="{{ url_for('static', filename='js/binding_3d_highlight.js') }}"></script>
 </body>
 </html>
