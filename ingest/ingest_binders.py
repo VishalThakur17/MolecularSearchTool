@@ -57,17 +57,61 @@ def fetch_molecule_details(chembl_molecule_id: str):
     return response.json()
 
 
+def _molecule_text(molecule_record: dict) -> str:
+    parts = [
+        molecule_record.get("pref_name"),
+        molecule_record.get("molecule_type"),
+        molecule_record.get("molecule_chembl_id"),
+    ]
+
+    for synonym in molecule_record.get("molecule_synonyms", []) or []:
+        if isinstance(synonym, dict):
+            parts.append(synonym.get("molecule_synonym"))
+            parts.append(synonym.get("syn_type"))
+
+    biotherapeutic = molecule_record.get("biotherapeutic") or {}
+    if isinstance(biotherapeutic, dict):
+        parts.extend(str(v) for v in biotherapeutic.values() if v)
+
+    return " ".join(str(p) for p in parts if p).lower()
+
+
 def infer_modality(molecule_record: dict) -> str:
+    text = _molecule_text(molecule_record)
     molecule_type = (molecule_record.get("molecule_type") or "").lower()
-    pref_name = (molecule_record.get("pref_name") or "").lower()
+
+    if any(term in text for term in [
+        "antibody-drug conjugate", "antibody drug conjugate", " adc ",
+        "emtansine", "deruxtecan", "vedotin", "ozogamicin",
+        "tesirine", "mafodotin", "duocarmazine"
+    ]):
+        return "Antibody-Drug Conjugate"
+
+    if any(term in text for term in [
+        "bispecific", "bi-specific", "bi specific", "dual-specific",
+        "dual specific", "bite", "t-cell engager", "t cell engager"
+    ]):
+        return "Bispecific Antibody"
+
+    if any(term in text for term in [
+        "nanobody", "vhh", "single-domain antibody", "single domain antibody",
+        "camelid", "sdab"
+    ]):
+        return "Nanobody / VHH"
+
+    if any(term in text for term in [
+        "fc fusion", "fc-fusion", "fusion protein", "receptor-fc",
+        "receptor fc", "fc region", "trap"
+    ]):
+        return "Fc Fusion"
+
+    if "peptide" in text or "oligopeptide" in molecule_type:
+        return "Peptide"
 
     if any(term in molecule_type for term in ["antibody", "protein", "monoclonal"]):
         return "Antibody"
 
-    if any(term in molecule_type for term in ["peptide", "oligopeptide"]):
-        return "Peptide"
-
-    if any(term in pref_name for term in ["mab", "monoclonal"]):
+    if any(term in text for term in ["mab", "monoclonal"]):
         return "Antibody"
 
     return "Small Molecule"
@@ -160,36 +204,63 @@ def extract_sequence(molecule_record: dict) -> str | None:
 
 
 def infer_binder_type(molecule_record: dict) -> str:
+    text = _molecule_text(molecule_record)
     molecule_type = (molecule_record.get("molecule_type") or "").lower().strip()
-    pref_name = (molecule_record.get("pref_name") or "").lower().strip()
+    molecule_structures = molecule_record.get("molecule_structures") or {}
+    molecule_properties = molecule_record.get("molecule_properties") or {}
     sequence = (extract_sequence(molecule_record) or "").strip()
 
-    if any(term in molecule_type for term in ["nanobody", "vhh", "single domain antibody"]):
-        return "VHH"
-    if any(term in pref_name for term in [" nanobody", " vhh"]):
+    # Order matters. ADCs and bispecifics usually include antibody-like terms,
+    # so they must be checked before general IgG / monoclonal antibody.
+    if any(term in text for term in [
+        "antibody-drug conjugate", "antibody drug conjugate", " adc ",
+        "emtansine", "deruxtecan", "vedotin", "ozogamicin",
+        "tesirine", "mafodotin", "duocarmazine", "maytansinoid"
+    ]):
+        return "ADC"
+
+    if any(term in text for term in [
+        "bispecific", "bi-specific", "bi specific", "dual-specific",
+        "dual specific", "bite", "t-cell engager", "t cell engager"
+    ]):
+        return "Bispecific Antibody"
+
+    if any(term in text for term in [
+        "nanobody", "vhh", "single-domain antibody", "single domain antibody",
+        "camelid", "sdab"
+    ]):
         return "VHH"
 
-    if "antibody" in molecule_type or "monoclonal" in molecule_type:
-        return "IgG"
-    if pref_name.endswith("mab") or " monoclonal " in pref_name:
-        return "IgG"
+    if any(term in text for term in [
+        "fc fusion", "fc-fusion", "fusion protein", "receptor-fc",
+        "receptor fc", "fc region", "trap"
+    ]):
+        return "Fc Fusion"
 
-    if "peptide" in molecule_type or "oligopeptide" in molecule_type:
+    if "peptide" in text or "oligopeptide" in molecule_type:
         return "Peptide"
+
     if sequence:
         seq_len = len(sequence)
         if 2 <= seq_len <= 80:
             return "Peptide"
 
-    if molecule_type in ["small molecule", "synthetic small molecule", ""]:
-        if pref_name and not pref_name.endswith("mab"):
-            return "Small Molecule"
+    if "antibody" in molecule_type or "monoclonal" in molecule_type:
+        return "IgG"
 
+    pref_name = (molecule_record.get("pref_name") or "").lower().strip()
+    if pref_name.endswith("mab") or " monoclonal " in text:
+        return "IgG"
+
+    # ChEMBL records with SMILES, chemistry properties, or molecule_type = molecule
+    # are usually small molecules. Classify them explicitly instead of vague Other.
+    has_smiles = bool(molecule_structures.get("canonical_smiles"))
+    has_chem_props = bool(molecule_properties.get("full_mwt") or molecule_properties.get("alogp"))
     if (
-        molecule_type
-        and "molecule" in molecule_type
-        and "antibody" not in molecule_type
-        and "peptide" not in molecule_type
+        molecule_type in {"small molecule", "synthetic small molecule", "molecule", ""}
+        or "small molecule" in text
+        or has_smiles
+        or has_chem_props
     ):
         return "Small Molecule"
 
@@ -228,6 +299,11 @@ def upsert_source(cur, source_name: str, source_url: str):
 
 
 def get_or_create_modality(cur, modality_name: str):
+    if not modality_name:
+        modality_name = "Unknown"
+
+    # This project already uses binder_modalities as the referenced table for
+    # binders.modality_id. Do not use a separate modalities table here.
     cur.execute(
         """
         INSERT INTO binder_modalities (modality_name)
@@ -238,7 +314,10 @@ def get_or_create_modality(cur, modality_name: str):
         """,
         (modality_name,),
     )
-    return cur.fetchone()[0]
+    row = cur.fetchone()
+    if isinstance(row, dict):
+        return row["modality_id"]
+    return row[0]
 
 
 def get_protein_id_by_gene(cur, gene_symbol: str):

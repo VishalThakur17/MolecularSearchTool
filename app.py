@@ -22,8 +22,33 @@ DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 
-PRIMARY_BINDER_TYPES = ["IgG", "VHH", "Peptide"]
-EXTENDED_BINDER_TYPES = PRIMARY_BINDER_TYPES + ["Small Molecule", "Other"]
+FULL_BINDER_TYPES = [
+    "IgG",
+    "Bispecific Antibody",
+    "ADC",
+    "VHH",
+    "Fc Fusion",
+    "Peptide",
+]
+
+# Sponsor taxonomy + a practical separate class for non-protein therapeutics.
+# Small molecules are useful clinical context, but they are not part of the
+# sponsor's protein-binder taxonomy. Keeping them separate prevents hundreds
+# of kinase inhibitors from appearing as vague "Other" entries.
+NON_PROTEIN_THERAPEUTIC_TYPES = ["Small Molecule"]
+EXTENDED_BINDER_TYPES = FULL_BINDER_TYPES + NON_PROTEIN_THERAPEUTIC_TYPES + ["Other"]
+PRIMARY_BINDER_TYPES = FULL_BINDER_TYPES
+
+BINDER_TYPE_LABELS = {
+    "IgG": "Monoclonal Antibody (IgG)",
+    "Bispecific Antibody": "Bispecific Antibody",
+    "ADC": "Antibody-Drug Conjugate (ADC)",
+    "VHH": "Nanobody (VHH)",
+    "Fc Fusion": "Fc Fusion",
+    "Peptide": "Peptide",
+    "Small Molecule": "Small Molecule / Non-protein Therapeutic",
+    "Other": "Other / Unclassified",
+}
 
 
 def canonicalize_binder_type(value: str) -> str:
@@ -31,23 +56,64 @@ def canonicalize_binder_type(value: str) -> str:
     if not raw:
         return "Other"
 
-    if raw in {"igg", "igg antibody", "antibody", "monoclonal antibody", "mab"} or raw.endswith("mab"):
-        return "IgG"
-    if raw in {"vhh", "nanobody", "single domain antibody"} or "nanobody" in raw or raw == "vhh":
+    normalized = re.sub(r"[_\-]+", " ", raw)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    # Order matters. ADCs and bispecific antibodies are also antibodies,
+    # so classify these before the general IgG / monoclonal antibody rule.
+    if any(term in normalized for term in [
+        "antibody drug conjugate", "antibody drug", "drug conjugate",
+        "adc", "emtansine", "deruxtecan", "vedotin", "ozogamicin",
+        "tesirine", "mafodotin", "duocarmazine", "maytansinoid"
+    ]):
+        return "ADC"
+
+    if any(term in normalized for term in [
+        "bispecific", "bi specific", "dual specific", "multispecific",
+        "bite", "t cell engager", "t-cell engager", "engager"
+    ]):
+        return "Bispecific Antibody"
+
+    if any(term in normalized for term in [
+        "nanobody", "vhh", "single domain antibody", "single-domain antibody",
+        "camelid", "sdab"
+    ]):
         return "VHH"
-    if raw in {"peptide", "oligopeptide", "protein peptide"} or "peptide" in raw:
+
+    if any(term in normalized for term in [
+        "fc fusion", "fc-fusion", "fusion protein", "receptor fc",
+        "receptor-fc", "fc region", "trap"
+    ]):
+        return "Fc Fusion"
+
+    if any(term in normalized for term in [
+        "peptide", "oligopeptide", "protein peptide", "peptidomimetic"
+    ]):
         return "Peptide"
-    if raw in {"small molecule", "small-molecule", "small_molecule", "drug", "compound"} or "small molecule" in raw:
+
+    if (
+        normalized in {"igg", "igg antibody", "antibody", "monoclonal antibody", "mab"}
+        or normalized.endswith("mab")
+        or "monoclonal" in normalized
+    ):
+        return "IgG"
+
+    if any(term in normalized for term in [
+        "small molecule", "synthetic small molecule", "molecule",
+        "inhibitor", "tyrosine kinase inhibitor", "kinase inhibitor",
+        "drug", "compound", "chemical"
+    ]):
         return "Small Molecule"
+
     return "Other"
 
 
 def binder_classification_family(value: str) -> str:
     binder_type = canonicalize_binder_type(value)
-    if binder_type in PRIMARY_BINDER_TYPES:
-        return "Primary sponsor class"
+    if binder_type in FULL_BINDER_TYPES:
+        return "Full sponsor taxonomy"
     if binder_type == "Small Molecule":
-        return "Extended class"
+        return "Non-protein therapeutic context"
     return "Unresolved / other"
 
 
@@ -56,8 +122,9 @@ def decorate_binder_record(record: dict) -> dict:
         return record
     binder_type = canonicalize_binder_type(record.get("binder_type") or record.get("modality_name"))
     record["binder_type"] = binder_type
+    record["binder_type_label"] = BINDER_TYPE_LABELS.get(binder_type, binder_type)
     record["binder_class_family"] = binder_classification_family(binder_type)
-    record["is_primary_binder_class"] = binder_type in PRIMARY_BINDER_TYPES
+    record["is_primary_binder_class"] = binder_type in FULL_BINDER_TYPES
     record["disease_tags_label"] = "Disease tags"
     return record
 
@@ -68,7 +135,12 @@ def decorate_binder_records(records):
 
 def summarize_binder_classes(records):
     counter = Counter(canonicalize_binder_type((r or {}).get("binder_type") or (r or {}).get("modality_name")) for r in (records or []))
-    return summarize_counter(counter)
+    ordered = []
+    for binder_type in EXTENDED_BINDER_TYPES:
+        count = counter.get(binder_type, 0)
+        if count:
+            ordered.append({"label": binder_type, "count": count})
+    return ordered
 
 
 def build_binder_classification(binder: dict, proteins=None, trials=None, diseases=None, structures=None) -> dict:
@@ -78,11 +150,12 @@ def build_binder_classification(binder: dict, proteins=None, trials=None, diseas
     diseases = diseases or []
     structures = structures or []
 
-    binder_type = binder.get("binder_type") or canonicalize_binder_type(binder.get("modality_name"))
+    binder_type = canonicalize_binder_type(binder.get("binder_type") or binder.get("modality_name"))
     return {
-        "binder_type": binder_type or "Other",
+        "binder_type": binder_type,
+        "binder_type_label": BINDER_TYPE_LABELS.get(binder_type, binder_type),
         "class_family": binder.get("binder_class_family") or binder_classification_family(binder_type),
-        "is_primary_class": binder_type in PRIMARY_BINDER_TYPES,
+        "is_primary_class": binder_type in FULL_BINDER_TYPES,
         "linked_target_count": len(proteins),
         "linked_trial_count": len(trials),
         "linked_disease_count": len(diseases),
@@ -168,6 +241,50 @@ def build_binder_visualization(binder: dict, proteins=None, diseases=None, trial
     }
 
 
+
+
+def display_value(value, missing_text="Data not available from current source"):
+    if value is None:
+        return missing_text
+    if isinstance(value, str) and not value.strip():
+        return missing_text
+    return value
+
+
+def build_record_completeness(record: dict, fields: list[tuple[str, str]]) -> dict:
+    total = len(fields)
+    present_items = []
+    missing_items = []
+
+    for field_name, label in fields:
+        value = (record or {}).get(field_name)
+        is_present = value is not None and (not isinstance(value, str) or bool(value.strip()))
+        if is_present:
+            present_items.append(label)
+        else:
+            missing_items.append(label)
+
+    score = round((len(present_items) / total) * 100) if total else 0
+    return {
+        "score": score,
+        "present_count": len(present_items),
+        "total_count": total,
+        "present_items": present_items,
+        "missing_items": missing_items,
+    }
+
+
+def binder_sequence_message(binder: dict) -> str:
+    modality = safe_string((binder or {}).get("modality_name")).lower()
+    binder_type = safe_string((binder or {}).get("binder_type")).lower()
+    name = safe_string((binder or {}).get("binder_name"))
+
+    if "small molecule" in modality or binder_type == "other":
+        return f"Sequence is not applicable or not expected for {name or 'this record'} because it is currently stored as a small-molecule or non-protein therapeutic context item."
+
+    return "Sequence data is not available from the current source. For protein therapeutics, this can be added from a curated FASTA record or a biologics-specific source."
+
+
 def execute_search(query: str, binder_type=None, clinical_status=None, disease_name=None):
     route_decision = decide_search_route(
         query,
@@ -242,6 +359,10 @@ def get_filter_options():
             """)
             binder_types = [canonicalize_binder_type(row["binder_type"]) for row in cur.fetchall()]
             binder_types = [item for item in EXTENDED_BINDER_TYPES if item in set(binder_types)]
+            # Always expose the full sponsor taxonomy in the filter, even if one class has zero current records.
+            for item in EXTENDED_BINDER_TYPES:
+                if item not in binder_types:
+                    binder_types.append(item)
 
             cur.execute("""
                 SELECT DISTINCT clinical_status
@@ -1749,6 +1870,17 @@ def protein_detail(protein_id):
     structure_candidates = build_structure_candidates(structures, fallback_uniprot=protein.get("uniprot_accession"), fallback_title=protein.get("protein_name"))
     default_structure = structure_candidates[0] if structure_candidates else None
     binding_region_summary = build_binding_region_summary(binding_site_annotations, binding_site_mode)
+    protein_completeness = build_record_completeness(
+        protein,
+        [
+            ("protein_name", "Protein name"),
+            ("uniprot_accession", "UniProt accession"),
+            ("organism_name", "Organism"),
+            ("sequence_length", "Sequence length"),
+            ("subcellular_location", "Subcellular location"),
+            ("functional_description", "Functional description"),
+        ],
+    )
 
     return render_template(
         "protein_detail.html",
@@ -1764,6 +1896,8 @@ def protein_detail(protein_id):
         binding_site_annotations=binding_site_annotations,
         binding_site_mode=binding_site_mode,
         binding_region_summary=binding_region_summary,
+        protein_completeness=protein_completeness,
+        display_value=display_value,
     )
 
 
@@ -1822,8 +1956,8 @@ def binder_detail(binder_id):
                 FROM binder_structures bs
                 JOIN structures s ON bs.structure_id = s.structure_id
                 WHERE bs.binder_id = %s
-                ORDER BY s.pdb_id;
-            """, (binder_id,))
+                ORDER BY md5(%s || '-' || COALESCE(s.pdb_id, s.structure_id::text));
+            """, (binder_id, str(binder_id)))
             structures = cur.fetchall()
 
             cur.execute("""
@@ -1860,15 +1994,28 @@ def binder_detail(binder_id):
             related_binders = cur.fetchall()
 
             cur.execute("""
-                SELECT DISTINCT p.protein_id,p.protein_name,p.uniprot_accession,g.gene_symbol,s.structure_id,s.pdb_id,s.structure_title,s.experimental_method,s.resolution
-                FROM protein_binders pb
-                JOIN proteins p ON pb.protein_id = p.protein_id
-                LEFT JOIN genes g ON p.gene_id = g.gene_id
-                JOIN protein_structures ps ON p.protein_id = ps.protein_id
-                JOIN structures s ON ps.structure_id = s.structure_id
-                WHERE pb.binder_id = %s
-                ORDER BY p.protein_name, s.pdb_id;
-            """, (binder_id,))
+                SELECT *
+                FROM (
+                    SELECT DISTINCT
+                        p.protein_id,
+                        p.protein_name,
+                        p.uniprot_accession,
+                        g.gene_symbol,
+                        s.structure_id,
+                        s.pdb_id,
+                        s.structure_title,
+                        s.experimental_method,
+                        s.resolution,
+                        md5(%s || '-' || COALESCE(s.pdb_id, s.structure_id::text)) AS structure_sort_key
+                    FROM protein_binders pb
+                    JOIN proteins p ON pb.protein_id = p.protein_id
+                    LEFT JOIN genes g ON p.gene_id = g.gene_id
+                    JOIN protein_structures ps ON p.protein_id = ps.protein_id
+                    JOIN structures s ON ps.structure_id = s.structure_id
+                    WHERE pb.binder_id = %s
+                ) ranked_structures
+                ORDER BY structure_sort_key, protein_name;
+            """, (str(binder_id), binder_id))
             target_structures = cur.fetchall()
 
             binder_binding_maps, binder_binding_mode = build_binder_binding_maps(cur, binder, proteins)
@@ -1937,6 +2084,19 @@ def binder_detail(binder_id):
         trials=trials,
         related_binders=related_binders,
     )
+    binder_completeness = build_record_completeness(
+        binder,
+        [
+            ("binder_name", "Binder name"),
+            ("binder_type", "Binder type"),
+            ("clinical_status", "Clinical status"),
+            ("modality_name", "Modality"),
+            ("mechanism_of_action", "Mechanism of action"),
+            ("developer_company", "Developer"),
+            ("binder_description", "Description"),
+        ],
+    )
+    sequence_note = binder_sequence_message(binder) if not binder.get("sequence") else None
 
     return render_template(
         "binder_detail.html",
@@ -1962,6 +2122,9 @@ def binder_detail(binder_id):
         binder_classification=binder_classification,
         binder_visualization=binder_visualization,
         binder_3d_annotations=binder_3d_annotations,
+        binder_completeness=binder_completeness,
+        sequence_note=sequence_note,
+        display_value=display_value,
     )
 
 
