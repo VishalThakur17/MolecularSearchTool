@@ -1,0 +1,30 @@
+from pathlib import Path
+from ingest.db import get_connection
+
+
+def run_sql_file(path: Path) -> None:
+    sql = path.read_text(encoding="utf-8")
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+
+
+def main():
+    base_dir = Path(__file__).resolve().parent
+    migration_files = [
+        base_dir / "migrations" / "003_complete_binder_data_model.sql",
+        base_dir / "migrations" / "004_full_binder_model_sync.sql",
+    ]
+
+    for migration_file in migration_files:
+        if not migration_file.exists():
+            print(f"Skipping missing migration: {migration_file}")
+            continue
+        print(f"Running {migration_file.name}...")
+        run_sql_file(migration_file)
+
+
+
+if __name__ == "__main__":
+    main()

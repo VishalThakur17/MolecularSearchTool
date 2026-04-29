@@ -659,6 +659,51 @@
         </div>
 
         <div class="card">
+            <h2>Binder Data Completeness</h2>
+            <p class="section-intro">
+                This section verifies that the binder profile includes the sponsor-requested core data: type, sequence, target links, disease tags, clinical evidence, and structure availability.
+            </p>
+
+            <div class="breakdown-grid">
+                <div class="breakdown-box">
+                    <h3 style="margin-top:0;">Completeness Score</h3>
+                    <div class="stat-value">{{ binder_completeness.score }}%</div>
+                    <p class="side-note">
+                        {{ binder_completeness.present_count }} of {{ binder_completeness.total_count }} core binder fields are populated or intentionally represented.
+                    </p>
+                </div>
+
+                <div class="breakdown-box">
+                    <h3 style="margin-top:0;">Structure Status</h3>
+                    <p class="side-note">{{ structure_status.message }}</p>
+                    <div class="mini-list">
+                        <div class="mini-row">
+                            <span class="mini-label">Direct binder structures</span>
+                            <span class="mini-count">{{ structure_status.direct_count }}</span>
+                        </div>
+                        <div class="mini-row">
+                            <span class="mini-label">Viewer candidates</span>
+                            <span class="mini-count">{{ structure_status.viewer_count }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if binder_completeness.missing_items %}
+                <div class="breakdown-box" style="margin-top:16px;">
+                    <h3 style="margin-top:0;">Still Missing</h3>
+                    <div class="tag-list">
+                        {% for item in binder_completeness.missing_items %}
+                            <span class="tag" style="background:#fee2e2;color:#991b1b;">{{ item }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <p class="empty" style="font-style:normal;color:#166534;font-weight:700;">This binder has all sponsor-requested core profile fields represented.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
             <h2>3D Structure Viewer</h2>
             <p class="section-intro">
                 This viewer prioritizes structures directly linked to the binder. If none are available, it can fall back to structures from linked targets, and finally to a predicted target model when possible.

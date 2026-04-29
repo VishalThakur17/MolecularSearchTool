@@ -2084,18 +2084,47 @@ def binder_detail(binder_id):
         trials=trials,
         related_binders=related_binders,
     )
+    # Sponsor-facing completeness model.
+    # This treats a binder as complete only when the page can show its core identity,
+    # sequence/status metadata, target links, disease-tag context, clinical evidence,
+    # and a direct or fallback structure status.
+    binder_completeness_input = dict(binder)
+    binder_completeness_input.update({
+        "sequence": binder.get("sequence"),
+        "linked_targets": "Available" if target_count > 0 else None,
+        "disease_tags": "Available" if disease_count > 0 else None,
+        "clinical_trials": "Available" if trial_count > 0 else None,
+        "structure_availability": "Available" if structure_candidates else None,
+    })
+
     binder_completeness = build_record_completeness(
-        binder,
+        binder_completeness_input,
         [
             ("binder_name", "Binder name"),
             ("binder_type", "Binder type"),
+            ("sequence", "Sequence / FASTA"),
             ("clinical_status", "Clinical status"),
             ("modality_name", "Modality"),
-            ("mechanism_of_action", "Mechanism of action"),
-            ("developer_company", "Developer"),
+            ("linked_targets", "Linked target(s)"),
+            ("disease_tags", "Disease tag(s)"),
+            ("clinical_trials", "Clinical trial evidence"),
+            ("structure_availability", "Structure availability"),
             ("binder_description", "Description"),
         ],
     )
+
+    structure_status = {
+        "direct_count": structure_count,
+        "viewer_count": len(structure_candidates or []),
+        "has_direct_structure": structure_count > 0,
+        "has_fallback_structure": bool(structure_candidates) and structure_count == 0,
+        "message": (
+            "Direct binder structure available." if structure_count > 0
+            else "No direct binder structure is linked; using target-linked or predicted fallback structure when available." if structure_candidates
+            else "No direct, target-linked, or predicted structure is currently available."
+        ),
+    }
+
     sequence_note = binder_sequence_message(binder) if not binder.get("sequence") else None
 
     return render_template(
@@ -2123,6 +2152,7 @@ def binder_detail(binder_id):
         binder_visualization=binder_visualization,
         binder_3d_annotations=binder_3d_annotations,
         binder_completeness=binder_completeness,
+        structure_status=structure_status,
         sequence_note=sequence_note,
         display_value=display_value,
     )

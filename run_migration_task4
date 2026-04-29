@@ -1,0 +1,24 @@
+from pathlib import Path
+from ingest.db import get_connection
+
+
+def main():
+    base_dir = Path(__file__).resolve().parent
+    sql_files = [
+        base_dir / "migrations" / "003_complete_binder_data_model.sql",
+        base_dir / "migrations" / "004_full_binder_model_sync.sql",
+    ]
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for sql_file in sql_files:
+                if sql_file.exists():
+                    print(f"Running {sql_file.name}...")
+                    cur.execute(sql_file.read_text(encoding="utf-8"))
+        conn.commit()
+    print("✅ Task 4/5 binder relationship model migration completed.")
+
+
+if __name__ == "__main__":
+    main()
+
+
