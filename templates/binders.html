@@ -230,11 +230,6 @@
       <div class="hero-panel">
         <div class="eyebrow">Binder-First Exploration</div>
         <h1>Browse therapeutic binders as first-class records</h1>
-        <p>
-          This page directly supports the sponsor request to make binders the primary therapeutic objects.
-          Filter by binder type, clinical status, and disease tag, then open any binder detail page for targets,
-          trials, structures, and relationship evidence.
-        </p>
         <div class="stats">
           <div class="stat-pill">{{ binders|length }} binder{% if binders|length != 1 %}s{% endif %} shown</div>
           {% for item in binder_type_breakdown %}
