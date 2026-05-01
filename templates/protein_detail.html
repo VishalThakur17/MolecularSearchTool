@@ -786,6 +786,13 @@
                                 </div>
                             {% endfor %}
                         </div>
+                        {% if binders_pagination and (binders_pagination.has_prev or binders_pagination.has_next) %}
+                            <div class="pagination-actions">
+                                {% if binders_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('binders_page', binders_pagination.prev_page) }}">Previous Binders</a>{% endif %}
+                                <span class="pagination-status">Showing {{ binders_pagination.showing }} of {{ binders_pagination.total }} binders</span>
+                                {% if binders_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('binders_page', binders_pagination.next_page) }}">Load More Binders</a>{% endif %}
+                            </div>
+                        {% endif %}
                     {% else %}
                         <p class="empty">No linked binders found.</p>
                     {% endif %}
@@ -804,6 +811,13 @@
                                 </div>
                             {% endfor %}
                         </div>
+                        {% if trials_pagination and (trials_pagination.has_prev or trials_pagination.has_next) %}
+                            <div class="pagination-actions">
+                                {% if trials_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.prev_page) }}">Previous Trials</a>{% endif %}
+                                <span class="pagination-status">Showing {{ trials_pagination.showing }} of {{ trials_pagination.total }} trials</span>
+                                {% if trials_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.next_page) }}">Load More Trials</a>{% endif %}
+                            </div>
+                        {% endif %}
                     {% else %}
                         <p class="empty">No linked trials found.</p>
                     {% endif %}
@@ -822,6 +836,13 @@
                                 </div>
                             {% endfor %}
                         </div>
+                        {% if structures_pagination and (structures_pagination.has_prev or structures_pagination.has_next) %}
+                            <div class="pagination-actions">
+                                {% if structures_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.prev_page) }}">Previous Structures</a>{% endif %}
+                                <span class="pagination-status">Showing {{ structures_pagination.showing }} of {{ structures_pagination.total }} structures</span>
+                                {% if structures_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.next_page) }}">Load More Structures</a>{% endif %}
+                            </div>
+                        {% endif %}
                     {% else %}
                         <p class="empty">No linked experimental structures found. The viewer may still show a fallback model.</p>
                     {% endif %}

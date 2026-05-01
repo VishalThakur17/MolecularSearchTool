@@ -152,6 +152,29 @@
       margin-top: 2px;
     }
 
+    .nav-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-link {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(96, 165, 250, 0.16);
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 650;
+    }
+
+    .nav-link.active,
+    .nav-link:hover {
+      color: var(--blue-deep);
+      background: #eff6ff;
+      border-color: rgba(96, 165, 250, 0.28);
+    }
+
     .hero {
       padding: 42px 0 28px;
     }
@@ -605,6 +628,11 @@
         align-items: flex-start;
       }
     }
+
+    .pagination-actions { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 24px 0 8px; flex-wrap: wrap; }
+    .pagination-status { color: var(--muted); font-size: 0.92rem; }
+    .load-more-link { display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: #ffffff; color: var(--text); font-weight: 800; text-decoration: none; }
+    .load-more-link:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08); }
   </style>
 </head>
 <body>
@@ -742,6 +770,7 @@
               <a class="quick-link" href="/?q=lung+cancer">lung cancer</a>
               <a class="quick-link" href="/?q=HER2">HER2</a>
               <a class="quick-link" href="/?q=Cetuximab">Cetuximab</a>
+              <a class="quick-link" href="/binders">Browse all binders</a>
             </div>
             <div class="route-note" style="margin-top:14px;color:var(--muted);font-size:0.92rem;line-height:1.6;">
               Binder classification is centered on the sponsor MVP classes <strong>IgG</strong>, <strong>VHH</strong>, and <strong>Peptide</strong>.
@@ -896,6 +925,19 @@
                       {% endfor %}
                     {% endif %}
                   </div>
+                  {% set section_pagination = results[section_name ~ '_pagination'] %}
+                  {% set section_page_param = results[section_name ~ '_page_param'] %}
+                  {% if section_pagination and (section_pagination.has_prev or section_pagination.has_next) %}
+                    <div class="pagination-actions">
+                      {% if section_pagination.has_prev %}
+                        <a class="load-more-link" href="{{ pagination_url(section_page_param, section_pagination.prev_page) }}">Previous {{ title }}</a>
+                      {% endif %}
+                      <span class="pagination-status">Showing {{ section_pagination.showing }} of {{ section_pagination.total }} {{ title|lower }}</span>
+                      {% if section_pagination.has_next %}
+                        <a class="load-more-link" href="{{ pagination_url(section_page_param, section_pagination.next_page) }}">Load More {{ title }}</a>
+                      {% endif %}
+                    </div>
+                  {% endif %}
                 {% else %}
                   <div class="empty-state">
                     No results were returned in this section for the current search and filter combination.

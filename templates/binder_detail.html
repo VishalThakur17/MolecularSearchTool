@@ -1029,6 +1029,7 @@
                                 </div>
                             {% endfor %}
                         </div>
+                        {% if proteins_pagination and (proteins_pagination.has_prev or proteins_pagination.has_next) %}<div class="pagination-actions">{% if proteins_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('proteins_page', proteins_pagination.prev_page) }}">Previous Targets</a>{% endif %}<span class="pagination-status">Showing {{ proteins_pagination.showing }} of {{ proteins_pagination.total }} targets</span>{% if proteins_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('proteins_page', proteins_pagination.next_page) }}">Load More Targets</a>{% endif %}</div>{% endif %}
                     {% else %}
                         <p class="empty">No linked targets were found for this binder.</p>
                     {% endif %}
@@ -1090,6 +1091,7 @@
                                 </div>
                             {% endfor %}
                         </div>
+                        {% if trials_pagination and (trials_pagination.has_prev or trials_pagination.has_next) %}<div class="pagination-actions">{% if trials_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.prev_page) }}">Previous Trials</a>{% endif %}<span class="pagination-status">Showing {{ trials_pagination.showing }} of {{ trials_pagination.total }} trials</span>{% if trials_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.next_page) }}">Load More Trials</a>{% endif %}</div>{% endif %}
                     {% else %}
                         <p class="empty">No linked clinical trials were found for this binder.</p>
                     {% endif %}
@@ -1108,6 +1110,7 @@
                                 </div>
                             {% endfor %}
                         </div>
+                        {% if structures_pagination and (structures_pagination.has_prev or structures_pagination.has_next) %}<div class="pagination-actions">{% if structures_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.prev_page) }}">Previous Structures</a>{% endif %}<span class="pagination-status">Showing {{ structures_pagination.showing }} of {{ structures_pagination.total }} structures</span>{% if structures_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.next_page) }}">Load More Structures</a>{% endif %}</div>{% endif %}
                     {% else %}
                         <p class="empty">No direct binder structures were found. The viewer may still show target-linked or fallback entries.</p>
                     {% endif %}
@@ -1129,6 +1132,7 @@
                                 </div>
                             {% endfor %}
                         </div>
+                        {% if related_binders_pagination and (related_binders_pagination.has_prev or related_binders_pagination.has_next) %}<div class="pagination-actions">{% if related_binders_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('related_binders_page', related_binders_pagination.prev_page) }}">Previous Related Binders</a>{% endif %}<span class="pagination-status">Showing {{ related_binders_pagination.showing }} of {{ related_binders_pagination.total }} related binders</span>{% if related_binders_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('related_binders_page', related_binders_pagination.next_page) }}">Load More Related Binders</a>{% endif %}</div>{% endif %}
                     {% else %}
                         <p class="empty">No related binders are currently available.</p>
                     {% endif %}

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browse Binders | Molecular Search Tool</title>
+  <style>
+    :root {
+      --bg: #f7fbff;
+      --panel: #ffffff;
+      --panel-2: #f8fcff;
+      --line: rgba(96, 165, 250, 0.18);
+      --line-strong: rgba(96, 165, 250, 0.32);
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --shadow: 0 18px 46px rgba(96, 165, 250, 0.13);
+      --radius: 24px;
+      --max: 1380px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #fcfeff 0%, var(--bg) 55%, #eef7ff 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: linear-gradient(135deg, #eff6ff, #dbeafe);
+      border: 1px solid var(--line-strong);
+      color: var(--blue);
+      display: grid; place-items: center;
+      font-weight: 800;
+    }
+    .brand-title { font-weight: 800; }
+    .brand-subtitle { color: var(--muted); font-size: 0.84rem; margin-top: 2px; }
+    .nav-links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .nav-link {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 650;
+    }
+    .nav-link.active, .nav-link:hover { color: var(--blue); background: #eff6ff; border-color: var(--line-strong); }
+    .container { max-width: var(--max); margin: 0 auto; padding: 0 22px; }
+    .hero { padding: 38px 0 22px; }
+    .hero-panel {
+      background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,249,255,0.98));
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      padding: 32px;
+    }
+    .eyebrow {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #eff6ff;
+      border: 1px solid var(--line);
+      color: var(--blue);
+      font-size: 0.82rem;
+      font-weight: 750;
+      margin-bottom: 14px;
+    }
+    h1 { margin: 0; font-size: clamp(2.1rem, 4vw, 3.7rem); letter-spacing: -0.04em; line-height: 1.05; }
+    .hero p { margin: 14px 0 0; color: var(--muted); font-size: 1.02rem; max-width: 840px; line-height: 1.7; }
+    .stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+    .stat-pill {
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.76);
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 650;
+    }
+    .filter-panel {
+      margin: 18px 0 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    .filter-grid {
+      display: grid;
+      grid-template-columns: 1.5fr repeat(4, minmax(170px, 1fr)) auto;
+      gap: 14px;
+      align-items: end;
+    }
+    label { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 800; margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.06em; }
+    input, select {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      padding: 11px 12px;
+      font-size: 0.95rem;
+      outline: none;
+      background: #fff;
+      color: var(--text);
+    }
+    input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,99,235,0.08); }
+    .actions { display: flex; gap: 10px; }
+    .btn {
+      min-height: 44px;
+      padding: 11px 16px;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+    .btn-primary { background: linear-gradient(135deg, #2563eb, #60a5fa); color: #fff; }
+    .btn-secondary { background: #fff; color: var(--muted); border-color: var(--line-strong); }
+    .message {
+      padding: 15px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #fff;
+      margin-bottom: 18px;
+      color: var(--muted);
+    }
+    .message-error { border-color: rgba(239,68,68,0.28); background: #fff7f7; color: #991b1b; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 42px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 12px 30px rgba(96, 165, 250, 0.08);
+      transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow); }
+    .card h3 { margin: 0 0 12px; font-size: 1.08rem; line-height: 1.35; }
+    .card h3 a { color: var(--blue); }
+    .meta-row { display: grid; grid-template-columns: 118px 1fr; gap: 8px; margin: 7px 0; font-size: 0.92rem; }
+    .label { color: var(--muted); font-weight: 800; }
+    .value { color: var(--text); }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .tag {
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 0.78rem;
+      font-weight: 750;
+    }
+    .tag.green { background: #dcfce7; color: #047857; }
+    .tag.amber { background: #fef3c7; color: #92400e; }
+    .empty {
+      background: var(--panel);
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+      padding: 30px;
+      color: var(--muted);
+      text-align: center;
+    }
+    @media (max-width: 1120px) {
+      .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      .nav-inner { align-items: flex-start; flex-direction: column; }
+      .filter-grid, .cards { grid-template-columns: 1fr; }
+      .hero-panel { padding: 24px; }
+      .actions { flex-direction: column; }
+    }
+
+    .pagination-actions { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 24px 0 8px; flex-wrap: wrap; }
+    .pagination-status { color: var(--muted); font-size: 0.92rem; }
+    .load-more-link { display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: #ffffff; color: var(--text); font-weight: 800; text-decoration: none; }
+    .load-more-link:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08); }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a class="brand" href="/">
+        <div class="brand-mark">M</div>
+        <div>
+          <div class="brand-title">Molecular Search Tool</div>
+          <div class="brand-subtitle">Binder-target intelligence platform</div>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a class="nav-link" href="/">Search</a>
+        <a class="nav-link active" href="/binders">Browse Binders</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="hero">
+      <div class="hero-panel">
+        <div class="eyebrow">Binder-First Exploration</div>
+        <h1>Browse therapeutic binders as first-class records</h1>
+        <p>
+          This page directly supports the sponsor request to make binders the primary therapeutic objects.
+          Filter by binder type, clinical status, and disease tag, then open any binder detail page for targets,
+          trials, structures, and relationship evidence.
+        </p>
+        <div class="stats">
+          <div class="stat-pill">{{ binders|length }} binder{% if binders|length != 1 %}s{% endif %} shown</div>
+          {% for item in binder_type_breakdown %}
+            <div class="stat-pill">{{ item.label }}: {{ item.count }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="filter-panel">
+      <form method="GET" action="/binders">
+        <div class="filter-grid">
+          <div>
+            <label for="q">Binder, target, disease, or mechanism</label>
+            <input id="q" name="q" type="text" value="{{ query or '' }}" placeholder="Try EGFR, HER2, lung cancer, panitumumab, peptide" />
+          </div>
+
+          <div>
+            <label for="binder_type">Binder Type</label>
+            <select id="binder_type" name="binder_type">
+              <option value="">All types</option>
+              {% for item in filter_options.binder_types %}
+                <option value="{{ item }}" {% if selected_binder_type == item %}selected{% endif %}>{{ item }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label for="clinical_status">Clinical Status</label>
+            <select id="clinical_status" name="clinical_status">
+              <option value="">All statuses</option>
+              {% for item in filter_options.clinical_statuses %}
+                <option value="{{ item }}" {% if selected_clinical_status == item %}selected{% endif %}>{{ item }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label for="disease_name">Disease Tag</label>
+            <select id="disease_name" name="disease_name">
+              <option value="">All disease tags</option>
+              {% for item in filter_options.diseases %}
+                <option value="{{ item }}" {% if selected_disease_name == item %}selected{% endif %}>{{ item }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label for="sort">Sort</label>
+            <select id="sort" name="sort">
+              <option value="clinical_status" {% if selected_sort == 'clinical_status' %}selected{% endif %}>Clinical priority</option>
+              <option value="name_asc" {% if selected_sort == 'name_asc' %}selected{% endif %}>Name A-Z</option>
+              <option value="name_desc" {% if selected_sort == 'name_desc' %}selected{% endif %}>Name Z-A</option>
+              <option value="binder_type" {% if selected_sort == 'binder_type' %}selected{% endif %}>Binder type</option>
+              <option value="target_count" {% if selected_sort == 'target_count' %}selected{% endif %}>Most targets</option>
+              <option value="trial_count" {% if selected_sort == 'trial_count' %}selected{% endif %}>Most trials</option>
+            </select>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Apply</button>
+            <a class="btn btn-secondary" href="/binders">Clear</a>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    {% if error %}
+      <div class="message message-error"><strong>Error:</strong> {{ error }}</div>
+    {% endif %}
+
+    {% if binders and binders|length > 0 %}
+      <section class="cards">
+        {% for binder in binders %}
+          <article class="card">
+            <h3><a href="/binder/{{ binder.binder_id }}">{{ binder.binder_name }}</a></h3>
+            <div class="meta-row"><div class="label">Type</div><div class="value">{{ binder.binder_type or 'Not available' }}</div></div>
+            <div class="meta-row"><div class="label">Status</div><div class="value">{{ binder.clinical_status or binder.approval_status or 'Not available' }}</div></div>
+            <div class="meta-row"><div class="label">Targets</div><div class="value">{{ binder.target_count or 0 }}</div></div>
+            <div class="meta-row"><div class="label">Diseases</div><div class="value">{{ binder.disease_count or 0 }}</div></div>
+            <div class="meta-row"><div class="label">Trials</div><div class="value">{{ binder.trial_count or 0 }}</div></div>
+            {% if binder.target_preview_list %}
+              <div class="meta-row"><div class="label">Target preview</div><div class="value">{{ binder.target_preview_list|join(', ') }}</div></div>
+            {% endif %}
+            {% if binder.disease_preview_list %}
+              <div class="meta-row"><div class="label">Disease tags</div><div class="value">{{ binder.disease_preview_list|join(', ') }}</div></div>
+            {% endif %}
+            <div class="tag-row">
+              <span class="tag">Binder-first record</span>
+              {% if binder.has_sequence %}<span class="tag green">Sequence available</span>{% endif %}
+              {% if binder.has_direct_structure %}<span class="tag green">Direct structure</span>{% else %}<span class="tag amber">Target fallback structure</span>{% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </section>
+      {% if binders_pagination and (binders_pagination.has_prev or binders_pagination.has_next) %}
+        <div class="pagination-actions">
+          {% if binders_pagination.has_prev %}
+            <a class="load-more-link" href="{{ pagination_url('page', binders_pagination.prev_page) }}">Previous Page</a>
+          {% endif %}
+          <span class="pagination-status">Showing {{ binders_pagination.showing }} records</span>
+          {% if binders_pagination.has_next %}
+            <a class="load-more-link" href="{{ pagination_url('page', binders_pagination.next_page) }}">Load More Binders</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="empty">
+        No binders matched the current filter combination. Try clearing one filter or searching a broader term.
+      </div>
+    {% endif %}
+  </main>
+</body>
+</html>

@@ -1621,93 +1621,187 @@ def search_database(search_term: str, binder_type=None, clinical_status=None, di
     return results
 
 
-def build_free_summary(query: str, results: dict, binder_type=None, clinical_status=None, disease_name=None) -> str:
-    diseases = results.get("diseases", [])
-    proteins = results.get("proteins", [])
-    binders = results.get("binders", [])
-    trials = results.get("trials", [])
-    intent = results.get("intent", "general")
 
-    disease_count = len(diseases)
-    protein_count = len(proteins)
-    binder_count = len(binders)
-    trial_count = len(trials)
 
-    if disease_count == 0 and protein_count == 0 and binder_count == 0 and trial_count == 0:
-        return (
-            f'No matching records were found for "{query}" in the current dataset. '
-            "Try a different keyword or adjust the filters."
-        )
 
-    intent_labels = {
-        "binder": "binder-focused",
-        "protein": "target/protein-focused",
-        "disease": "disease-tag-filtered",
-        "trial": "clinical-trial-focused",
-        "sequence": "sequence-style",
-        "general": "general"
+PAGE_SIZE = 25
+
+def get_page_param(param_name: str, default: int = 1) -> int:
+    try:
+        value = int(request.args.get(param_name, default))
+        return max(value, 1)
+    except (TypeError, ValueError):
+        return default
+
+def paginate_records(records, page: int, per_page: int = PAGE_SIZE):
+    records = list(records or [])
+    page = max(int(page or 1), 1)
+    start = (page - 1) * per_page
+    end = start + per_page
+    return records[start:end], {
+        "page": page,
+        "per_page": per_page,
+        "total": len(records),
+        "showing": min(end, len(records)),
+        "has_prev": page > 1,
+        "has_next": end < len(records),
+        "prev_page": max(page - 1, 1),
+        "next_page": page + 1,
     }
 
-    filter_parts = []
+def build_page_url(param_name: str, page_value: int):
+    args = request.args.to_dict(flat=True)
+    if page_value <= 1:
+        args.pop(param_name, None)
+    else:
+        args[param_name] = page_value
+    view_args = dict(request.view_args or {})
+    return url_for(request.endpoint, **view_args, **args)
+
+@app.context_processor
+def inject_pagination_helpers():
+    return {"pagination_url": build_page_url, "page_size": PAGE_SIZE}
+
+def fetch_binder_browser(query=None, binder_type=None, clinical_status=None, disease_name=None, sort='clinical_status', page=1, per_page=PAGE_SIZE):
+    """Return a paginated binder-first browse table with sponsor filters."""
+    query = (query or '').strip()
+    like_query = f"%{query}%"
+    page = max(int(page or 1), 1)
+    per_page = max(int(per_page or PAGE_SIZE), 1)
+    offset = (page - 1) * per_page
+    related_join_needed = bool(query or disease_name)
+
+    sql = """
+        WITH base_binders AS (
+            SELECT DISTINCT
+                b.binder_id,
+                b.binder_name,
+                b.binder_type,
+                b.sequence,
+                b.clinical_status,
+                b.approval_status,
+                b.mechanism_of_action,
+                b.binder_description,
+                bm.modality_name
+            FROM binders b
+            LEFT JOIN binder_modalities bm ON b.modality_id = bm.modality_id
+    """
+    if related_join_needed:
+        sql += """
+            LEFT JOIN protein_binders pb ON b.binder_id = pb.binder_id
+            LEFT JOIN proteins p ON pb.protein_id = p.protein_id
+            LEFT JOIN genes g ON p.gene_id = g.gene_id
+            LEFT JOIN binder_diseases bd ON b.binder_id = bd.binder_id
+            LEFT JOIN diseases d ON bd.disease_id = d.disease_id
+        """
+    sql += " WHERE 1=1 "
+
+    params = []
+    if query:
+        sql += """
+            AND (
+                b.binder_name ILIKE %s
+                OR b.binder_type ILIKE %s
+                OR b.clinical_status ILIKE %s
+                OR b.mechanism_of_action ILIKE %s
+                OR b.binder_description ILIKE %s
+                OR COALESCE(g.gene_symbol, '') ILIKE %s
+                OR COALESCE(p.protein_name, '') ILIKE %s
+                OR COALESCE(d.disease_name, '') ILIKE %s
+            )
+        """
+        params.extend([like_query] * 8)
     if binder_type:
-        filter_parts.append(f"binder type = {binder_type}")
+        sql += " AND b.binder_type = %s"
+        params.append(binder_type)
     if clinical_status:
-        filter_parts.append(f"clinical status = {clinical_status}")
+        sql += " AND b.clinical_status = %s"
+        params.append(clinical_status)
     if disease_name:
-        filter_parts.append(f"disease tag = {disease_name}")
+        sql += " AND d.disease_name = %s"
+        params.append(disease_name)
 
-    filter_text = ""
-    if filter_parts:
-        filter_text = " Active filters: " + ", ".join(filter_parts) + "."
+    if sort == 'name_desc':
+        sql += " ORDER BY b.binder_name DESC"
+    elif sort == 'binder_type':
+        sql += " ORDER BY b.binder_type ASC NULLS LAST, b.binder_name ASC"
+    else:
+        sql += " ORDER BY b.binder_name ASC"
 
-    parts = []
-    parts.append(
-        f'The search for "{query}" was interpreted as a {intent_labels.get(intent, "general")} query.'
-    )
-
-    if intent == "sequence":
-        parts.append(
-            "This looks like sequence-like input, so the current MVP is prioritizing binder-style matches as a placeholder for future sequence similarity search."
+    sql += """
+            LIMIT %s OFFSET %s
         )
-    elif intent == "binder":
-        parts.append(
-            "Results are ordered to keep binders first, followed by linked targets, trials, and disease context."
-        )
-    elif intent == "disease":
-        parts.append(
-            "This disease-style query is shown as a disease-tag exploration view rather than making disease the primary organizing pillar."
-        )
-    elif intent == "protein":
-        parts.append(
-            "Exact target-style searches may redirect directly to a protein page when there are no extra filters."
-        )
+        SELECT
+            b.binder_id, b.binder_name, b.binder_type, b.sequence,
+            b.clinical_status, b.approval_status, b.mechanism_of_action,
+            b.binder_description, b.modality_name,
+            (SELECT COUNT(DISTINCT pb.protein_id) FROM protein_binders pb WHERE pb.binder_id = b.binder_id) AS target_count,
+            (SELECT COUNT(DISTINCT bd.disease_id) FROM binder_diseases bd WHERE bd.binder_id = b.binder_id) AS disease_count,
+            (SELECT COUNT(DISTINCT bt.trial_id) FROM binder_trials bt WHERE bt.binder_id = b.binder_id) AS trial_count,
+            (SELECT COUNT(DISTINCT bs.structure_id) FROM binder_structures bs WHERE bs.binder_id = b.binder_id) AS direct_structure_count,
+            (
+                SELECT STRING_AGG(DISTINCT COALESCE(g.gene_symbol, p.protein_name), ', ')
+                FROM protein_binders pb
+                JOIN proteins p ON pb.protein_id = p.protein_id
+                LEFT JOIN genes g ON p.gene_id = g.gene_id
+                WHERE pb.binder_id = b.binder_id
+            ) AS target_preview,
+            (
+                SELECT STRING_AGG(DISTINCT d.disease_name, ', ')
+                FROM binder_diseases bd
+                JOIN diseases d ON bd.disease_id = d.disease_id
+                WHERE bd.binder_id = b.binder_id
+            ) AS disease_preview
+        FROM base_binders b
+    """
+    params.extend([per_page + 1, offset])
 
-    parts.append(
-        f'It returned {disease_count} disease record{"s" if disease_count != 1 else ""}, '
-        f'{protein_count} protein target{"s" if protein_count != 1 else ""}, '
-        f'{binder_count} therapeutic binder{"s" if binder_count != 1 else ""}, and '
-        f'{trial_count} clinical trial{"s" if trial_count != 1 else ""}.'
-        f'{filter_text}'
-    )
+    if sort == 'name_desc':
+        sql += " ORDER BY b.binder_name DESC"
+    elif sort == 'binder_type':
+        sql += " ORDER BY b.binder_type ASC NULLS LAST, b.binder_name ASC"
+    elif sort == 'target_count':
+        sql += " ORDER BY target_count DESC, b.binder_name ASC"
+    elif sort == 'trial_count':
+        sql += " ORDER BY trial_count DESC, b.binder_name ASC"
+    else:
+        sql += """
+            ORDER BY
+                CASE
+                    WHEN b.clinical_status ILIKE 'approved%%' THEN 1
+                    WHEN b.clinical_status ILIKE 'max phase 4%%' THEN 2
+                    WHEN b.clinical_status ILIKE 'phase 4%%' THEN 2
+                    WHEN b.clinical_status ILIKE 'phase 3%%' THEN 3
+                    WHEN b.clinical_status ILIKE 'max phase 3%%' THEN 3
+                    WHEN b.clinical_status ILIKE 'phase 2%%' THEN 4
+                    WHEN b.clinical_status ILIKE 'max phase 2%%' THEN 4
+                    WHEN b.clinical_status ILIKE 'phase 1%%' THEN 5
+                    WHEN b.clinical_status ILIKE 'max phase 1%%' THEN 5
+                    ELSE 6
+                END, b.binder_name ASC
+        """
+    sql += ";"
 
-    if binders:
-        top_binders = ", ".join([b.get("binder_name") or "Unknown binder" for b in binders[:3]])
-        parts.append(f"Top binder matches include {top_binders}.")
-    if proteins:
-        top_proteins = ", ".join([p.get("gene_symbol") or p.get("protein_name") or "Unknown protein" for p in proteins[:3]])
-        parts.append(f"Protein-related matches include {top_proteins}.")
-    if diseases:
-        top_diseases = ", ".join([d.get("disease_name") or "Unknown disease" for d in diseases[:3]])
-        parts.append(f"Disease-related matches include {top_diseases}.")
-    if trials:
-        top_trials = ", ".join([t.get("nct_id") or t.get("trial_title") or "Unknown trial" for t in trials[:2]])
-        parts.append(f"Relevant trial matches include {top_trials}.")
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, tuple(params))
+            rows = cur.fetchall()
 
-    parts.append(
-        "This summary is generated directly from retrieved database results currently stored in the platform."
-    )
+    has_next = len(rows) > per_page
+    rows = rows[:per_page]
+    rows = decorate_binder_records(rows)
+    for row in rows:
+        row['has_sequence'] = bool(safe_string(row.get('sequence')))
+        row['has_direct_structure'] = (row.get('direct_structure_count') or 0) > 0
+        row['target_preview_list'] = [x.strip() for x in safe_string(row.get('target_preview')).split(',') if x.strip()][:4]
+        row['disease_preview_list'] = [x.strip() for x in safe_string(row.get('disease_preview')).split(',') if x.strip()][:4]
 
-    return " ".join(parts)
+    pagination = {
+        "page": page, "per_page": per_page, "has_prev": page > 1,
+        "has_next": has_next, "prev_page": max(page - 1, 1),
+        "next_page": page + 1, "showing": offset + len(rows), "total": None,
+    }
+    return rows, pagination
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -1741,6 +1835,17 @@ def index():
             else:
                 results = search_database(effective_query, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
             results = apply_result_sorting(results, binder_sort, protein_sort, trial_sort, disease_sort)
+            for section_name, page_param in [
+                ("binders", "binders_page"),
+                ("proteins", "proteins_page"),
+                ("trials", "trials_page"),
+                ("diseases", "diseases_page"),
+            ]:
+                section_page = get_page_param(page_param)
+                paged_items, pagination = paginate_records(results.get(section_name, []), section_page)
+                results[section_name] = paged_items
+                results[f"{section_name}_pagination"] = pagination
+                results[f"{section_name}_page_param"] = page_param
             summary = build_free_summary(query, results, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
         except Exception as e:
             error = str(e)
@@ -1783,6 +1888,51 @@ def api_search():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+
+@app.route("/binders", methods=["GET"])
+def binders_browser():
+    query = request.args.get("q", "").strip()
+    binder_type = request.args.get("binder_type", "").strip() or None
+    clinical_status = request.args.get("clinical_status", "").strip() or None
+    disease_name = request.args.get("disease_name", "").strip() or None
+    sort = request.args.get("sort", "clinical_status").strip() or "clinical_status"
+    page = get_page_param("page")
+
+    filter_options = get_filter_options_safe()
+    binders = []
+    binder_pagination = {"page": page, "per_page": PAGE_SIZE, "has_prev": False, "has_next": False, "prev_page": 1, "next_page": 2, "showing": 0, "total": None}
+    error = None
+    try:
+        binders, binder_pagination = fetch_binder_browser(
+            query=query,
+            binder_type=binder_type,
+            clinical_status=clinical_status,
+            disease_name=disease_name,
+            sort=sort,
+            page=page,
+            per_page=PAGE_SIZE,
+        )
+    except Exception as exc:
+        error = str(exc)
+
+    binder_type_breakdown = summarize_binder_classes(binders)
+    status_breakdown = summarize_counter(Counter((b.get("clinical_status") or b.get("approval_status") or "Unknown") for b in binders))
+
+    return render_template(
+        "binders.html",
+        binders=binders,
+        binders_pagination=binder_pagination,
+        query=query,
+        error=error,
+        filter_options=filter_options,
+        selected_binder_type=binder_type,
+        selected_clinical_status=clinical_status,
+        selected_disease_name=disease_name,
+        selected_sort=sort,
+        binder_type_breakdown=binder_type_breakdown,
+        status_breakdown=status_breakdown,
+    )
 
 
 @app.route("/protein/<int:protein_id>")
@@ -1867,6 +2017,10 @@ def protein_detail(protein_id):
     binders = decorate_binder_records(binders)
     binder_type_breakdown = summarize_binder_classes(binders)
     binder_status_breakdown = summarize_counter(Counter((b.get("clinical_status") or b.get("approval_status") or "Unknown") for b in binders))
+    binders, binders_pagination = paginate_records(binders, get_page_param("binders_page"))
+    trials, trials_pagination = paginate_records(trials, get_page_param("trials_page"))
+    structures, structures_pagination = paginate_records(structures, get_page_param("structures_page"))
+    diseases, diseases_pagination = paginate_records(diseases, get_page_param("diseases_page"))
     structure_candidates = build_structure_candidates(structures, fallback_uniprot=protein.get("uniprot_accession"), fallback_title=protein.get("protein_name"))
     default_structure = structure_candidates[0] if structure_candidates else None
     binding_region_summary = build_binding_region_summary(binding_site_annotations, binding_site_mode)
@@ -1898,6 +2052,10 @@ def protein_detail(protein_id):
         binding_region_summary=binding_region_summary,
         protein_completeness=protein_completeness,
         display_value=display_value,
+        binders_pagination=binders_pagination,
+        trials_pagination=trials_pagination,
+        structures_pagination=structures_pagination,
+        diseases_pagination=diseases_pagination,
     )
 
 
@@ -2025,6 +2183,11 @@ def binder_detail(binder_id):
     related_binders = decorate_binder_records(related_binders)
     trial_phase_breakdown = summarize_counter(Counter((t.get("phase") or "Unknown") for t in trials))
     disease_category_breakdown = summarize_counter(Counter((d.get("disease_category") or "Uncategorized") for d in diseases))
+    proteins, proteins_pagination = paginate_records(proteins, get_page_param("proteins_page"))
+    trials, trials_pagination = paginate_records(trials, get_page_param("trials_page"))
+    structures, structures_pagination = paginate_records(structures, get_page_param("structures_page"))
+    diseases, diseases_pagination = paginate_records(diseases, get_page_param("diseases_page"))
+    related_binders, related_binders_pagination = paginate_records(related_binders, get_page_param("related_binders_page"))
 
     binder_story_parts = [
         f'{binder.get("binder_name", "This binder")} is currently classified as {binder.get("binder_type") or "an unclassified binder"}.',
@@ -2155,6 +2318,11 @@ def binder_detail(binder_id):
         structure_status=structure_status,
         sequence_note=sequence_note,
         display_value=display_value,
+        proteins_pagination=proteins_pagination,
+        trials_pagination=trials_pagination,
+        structures_pagination=structures_pagination,
+        diseases_pagination=diseases_pagination,
+        related_binders_pagination=related_binders_pagination,
     )
 
 
@@ -2274,6 +2442,10 @@ def trial_detail(trial_id):
         "diseases": len(diseases),
         "related_trials": len(related_trials)
     }
+    binders, binders_pagination = paginate_records(binders, get_page_param("binders_page"))
+    proteins, proteins_pagination = paginate_records(proteins, get_page_param("proteins_page"))
+    diseases, diseases_pagination = paginate_records(diseases, get_page_param("diseases_page"))
+    related_trials, related_trials_pagination = paginate_records(related_trials, get_page_param("related_trials_page"))
 
     return render_template(
         "trial_detail.html",
@@ -2283,7 +2455,11 @@ def trial_detail(trial_id):
         proteins=proteins,
         related_trials=related_trials,
         binder_type_breakdown=binder_type_breakdown,
-        trial_context_counts=trial_context_counts
+        trial_context_counts=trial_context_counts,
+        binders_pagination=binders_pagination,
+        proteins_pagination=proteins_pagination,
+        diseases_pagination=diseases_pagination,
+        related_trials_pagination=related_trials_pagination
     )
 
 
@@ -2395,6 +2571,10 @@ def disease_detail(disease_id):
     protein_gene_breakdown = summarize_counter(
         Counter((p.get("gene_symbol") or p.get("protein_name") or "Unknown target") for p in proteins[:12])
     )
+    binders, binders_pagination = paginate_records(binders, get_page_param("binders_page"))
+    proteins, proteins_pagination = paginate_records(proteins, get_page_param("proteins_page"))
+    trials, trials_pagination = paginate_records(trials, get_page_param("trials_page"))
+    related_diseases, related_diseases_pagination = paginate_records(related_diseases, get_page_param("related_diseases_page"))
 
     return render_template(
         "disease_detail.html",
@@ -2404,7 +2584,11 @@ def disease_detail(disease_id):
         binders=binders,
         related_diseases=related_diseases,
         binder_type_breakdown=binder_type_breakdown,
-        protein_gene_breakdown=protein_gene_breakdown
+        protein_gene_breakdown=protein_gene_breakdown,
+        binders_pagination=binders_pagination,
+        proteins_pagination=proteins_pagination,
+        trials_pagination=trials_pagination,
+        related_diseases_pagination=related_diseases_pagination
     )
 
 
