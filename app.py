@@ -1624,7 +1624,7 @@ def search_database(search_term: str, binder_type=None, clinical_status=None, di
 
 
 
-PAGE_SIZE = 25
+PAGE_SIZE = 5
 
 def get_page_param(param_name: str, default: int = 1) -> int:
     try:

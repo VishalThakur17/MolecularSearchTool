@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ binder.binder_name }} | Molecular Search Tool</title>
+    <title>{{ protein.gene_symbol or protein.protein_name }} | Molecular Search Tool</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -43,7 +43,7 @@
         }
 
         .page {
-            max-width: 1320px;
+            max-width: 1300px;
             margin: 30px auto;
             padding: 0 20px 40px;
         }
@@ -57,31 +57,18 @@
             border: 1px solid #dbeafe;
         }
 
-        .eyebrow {
-            display: inline-block;
-            margin-bottom: 14px;
-            padding: 8px 12px;
-            border-radius: 999px;
-            background: #eff6ff;
-            color: var(--blue);
-            font-size: 0.82rem;
-            font-weight: 700;
-            letter-spacing: 0.03em;
-            text-transform: uppercase;
-        }
-
         .hero h1 {
             margin: 0 0 10px 0;
-            font-size: 2.45rem;
+            font-size: 2.25rem;
             line-height: 1.1;
         }
 
         .subtitle {
             margin: 0;
             color: var(--muted);
-            font-size: 1.02rem;
+            font-size: 1rem;
             line-height: 1.65;
-            max-width: 940px;
+            max-width: 920px;
         }
 
         .badge-row {
@@ -100,36 +87,9 @@
             font-weight: 600;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 14px;
-            margin-top: 22px;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.72);
-            border: 1px solid #dbeafe;
-            border-radius: 16px;
-            padding: 16px;
-        }
-
-        .stat-label {
-            display: block;
-            color: #64748b;
-            font-size: 0.86rem;
-            margin-bottom: 8px;
-        }
-
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: var(--navy);
-        }
-
         .main-grid {
             display: grid;
-            grid-template-columns: 1.2fr 0.8fr;
+            grid-template-columns: 1.15fr 0.85fr;
             gap: 24px;
         }
 
@@ -149,7 +109,7 @@
 
         .card h2 {
             margin: 0 0 18px 0;
-            font-size: 1.35rem;
+            font-size: 1.32rem;
             color: var(--navy);
         }
 
@@ -175,25 +135,12 @@
             color: #1f2937;
         }
 
-        .text-box,
-        .sequence-box {
+        .text-box {
             background: var(--soft);
             border: 1px solid var(--line);
             border-radius: 14px;
             padding: 14px;
-        }
-
-        .sequence-box {
-            font-family: "Courier New", Courier, monospace;
-            font-size: 0.92rem;
-            line-height: 1.45;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        .empty {
-            color: #64748b;
-            font-style: italic;
+            line-height: 1.7;
         }
 
         .tag-list {
@@ -248,6 +195,11 @@
 
         .list-item a:hover {
             text-decoration: underline;
+        }
+
+        .empty {
+            color: #64748b;
+            font-style: italic;
         }
 
         .breakdown-grid {
@@ -372,119 +324,19 @@
             background: #0f172a;
         }
 
-        .relationship-grid {
-            display: grid;
-            grid-template-columns: 180px 1fr;
-            gap: 16px;
-            align-items: start;
-        }
-
-        .center-binder {
-            background: linear-gradient(180deg, #0f172a, #1e293b);
-            color: white;
-            border-radius: 20px;
-            padding: 18px;
-            text-align: center;
-            position: sticky;
-            top: 18px;
-        }
-
-        .center-binder .binder-type {
-            margin-top: 8px;
-            color: #cbd5e1;
-            font-size: 0.92rem;
-        }
-
-        .relationship-lanes {
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .relationship-lane {
-            display: grid;
-            grid-template-columns: 96px 1fr;
-            gap: 12px;
-            align-items: center;
-        }
-
-        .lane-label {
-            font-size: 0.86rem;
-            font-weight: 700;
-            color: #334155;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        .lane-items {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .node {
-            background: white;
-            border: 1px solid #cbd5e1;
-            border-radius: 14px;
-            padding: 10px 12px;
-            min-width: 180px;
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
-        }
-
-        .node a {
-            color: var(--blue);
-            text-decoration: none;
-            font-weight: 700;
-        }
-
-        .node a:hover {
-            text-decoration: underline;
-        }
-
-        .node small {
-            display: block;
-            color: #64748b;
-            margin-top: 4px;
-            line-height: 1.45;
-        }
-
-        .side-note {
-            color: #64748b;
-            line-height: 1.6;
-        }
-
-        .back-link {
-            display: inline-block;
-            margin-top: 8px;
-            color: var(--blue);
-            text-decoration: none;
-            font-weight: 700;
-        }
-
-        .back-link:hover {
-            text-decoration: underline;
-        }
-
         .binding-map-card{background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:14px}.binding-map-header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px}.binding-map-header h3{margin:0;font-size:1.05rem;color:var(--navy)}.binding-map-header p{margin:6px 0 0;color:var(--muted);line-height:1.5}.map-mode-badge{flex:0 0 auto;padding:7px 10px;border-radius:999px;background:#fee2e2;color:#991b1b;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.protein-ruler{position:relative;height:84px;border-radius:16px;background:linear-gradient(90deg,#e2e8f0,#f8fafc);border:1px solid #cbd5e1;overflow:hidden;margin:14px 0}.protein-ruler:before{content:"N";position:absolute;left:12px;top:10px;font-size:.75rem;font-weight:800;color:#475569}.protein-ruler:after{content:"C";position:absolute;right:12px;top:10px;font-size:.75rem;font-weight:800;color:#475569}.protein-axis{position:absolute;left:18px;right:18px;top:38px;height:10px;border-radius:999px;background:#94a3b8}.binding-segment{position:absolute;left:var(--left);width:var(--width);top:28px;height:30px;min-width:14px;border-radius:999px;background:var(--segment-color,#dc2626);box-shadow:0 8px 20px rgba(220,38,38,.24);border:2px solid rgba(255,255,255,.84)}.binding-label{position:absolute;left:var(--center);top:61px;transform:translateX(-50%);background:white;border:1px solid #cbd5e1;color:#334155;border-radius:999px;padding:4px 8px;font-size:.72rem;font-weight:800;white-space:nowrap;box-shadow:0 6px 14px rgba(15,23,42,.08)}.annotation-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:12px}.annotation-item{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:12px}.annotation-topline{display:flex;align-items:center;gap:8px;font-weight:800;color:var(--navy);margin-bottom:6px}.annotation-dot{width:11px;height:11px;flex:0 0 11px;border-radius:999px;background:var(--segment-color,#dc2626)}.annotation-item p{margin:4px 0;color:var(--muted);line-height:1.45;font-size:.9rem}
 
 
-        @media (max-width: 1100px) {
+        @media (max-width: 1050px) {
             .main-grid,
             .viewer-shell,
-            .breakdown-grid,
-            .relationship-grid,
-            .stats-grid {
+            .breakdown-grid {
                 grid-template-columns: 1fr;
-            }
-
-            .center-binder {
-                position: static;
             }
         }
 
-        @media (max-width: 760px) {
-            .info-grid,
-            .relationship-lane {
+        @media (max-width: 700px) {
+            .info-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -609,6 +461,46 @@
             font-size: 0.82rem !important;
             color: #64748b !important;
         }
+
+
+        .show-more-panel {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .show-more-status {
+            color: #64748b;
+            font-weight: 700;
+            font-size: 0.92rem;
+        }
+
+        .show-more-button {
+            border: 0;
+            border-radius: 999px;
+            background: #2563eb;
+            color: white;
+            padding: 11px 18px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+        }
+
+        .show-more-button:hover {
+            background: #1d4ed8;
+        }
+
+        .show-more-button[hidden],
+        .annotation-item.is-hidden,
+        .binding-map-item.is-hidden,
+        .show-more-item.is-hidden,
+        .three-d-annotation-row.is-hidden {
+            display: none;
+        }
+
 </style>
 </head>
 <body>
@@ -619,100 +511,29 @@
 
     <div class="page">
         <div class="hero">
-            <div class="eyebrow">Binder-Centric Visualization</div>
-            <h1>{{ binder.binder_name }}</h1>
+            <h1>{{ protein.gene_symbol or protein.protein_name }}</h1>
             <p class="subtitle">
-                {{ binder_story }}
+                This target page keeps the therapeutic layer visible while also letting the user inspect linked binders, disease tags, clinical evidence, and a 3D structure or fallback model directly inside the application.
             </p>
-
             <div class="badge-row">
-                <span class="badge">Binder Type: {{ binder.binder_type or 'Not available' }}</span>
-                <span class="badge">Classification Family: {{ binder_classification.class_family or 'Not available' }}</span>
-                <span class="badge">Clinical Status: {{ binder.clinical_status or binder.approval_status or 'Not available' }}</span>
-                <span class="badge">Modality: {{ binder.modality_name or 'Not available' }}</span>
-                <span class="badge">Sequence Length: {{ sequence_length if sequence_length else 'Not available' }}</span>
-                <span class="badge">Viewer Entries: {{ structure_candidates|length if structure_candidates else 0 }}</span>
+                <span class="badge">UniProt: {{ protein.uniprot_accession or 'Not available' }}</span>
+                <span class="badge">Organism: {{ protein.organism_name or 'Not available' }}</span>
+                <span class="badge">Linked Binders: {{ binders|length if binders else 0 }}</span>
+                <span class="badge">Linked Trials: {{ trials|length if trials else 0 }}</span>
+                <span class="badge">Structures in Viewer: {{ structure_candidates|length if structure_candidates else 0 }}</span>
             </div>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="stat-label">Linked Targets</span>
-                    <div class="stat-value">{{ target_count }}</div>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Clinical Trials</span>
-                    <div class="stat-value">{{ trial_count }}</div>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Disease Tags</span>
-                    <div class="stat-value">{{ disease_count }}</div>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Direct Structures</span>
-                    <div class="stat-value">{{ structure_count }}</div>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">3D Viewer Choices</span>
-                    <div class="stat-value">{{ structure_candidates|length if structure_candidates else 0 }}</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>Binder Data Completeness</h2>
-            <p class="section-intro">
-                This section verifies that the binder profile includes the sponsor-requested core data: type, sequence, target links, disease tags, clinical evidence, and structure availability.
-            </p>
-
-            <div class="breakdown-grid">
-                <div class="breakdown-box">
-                    <h3 style="margin-top:0;">Completeness Score</h3>
-                    <div class="stat-value">{{ binder_completeness.score }}%</div>
-                    <p class="side-note">
-                        {{ binder_completeness.present_count }} of {{ binder_completeness.total_count }} core binder fields are populated or intentionally represented.
-                    </p>
-                </div>
-
-                <div class="breakdown-box">
-                    <h3 style="margin-top:0;">Structure Status</h3>
-                    <p class="side-note">{{ structure_status.message }}</p>
-                    <div class="mini-list">
-                        <div class="mini-row">
-                            <span class="mini-label">Direct binder structures</span>
-                            <span class="mini-count">{{ structure_status.direct_count }}</span>
-                        </div>
-                        <div class="mini-row">
-                            <span class="mini-label">Viewer candidates</span>
-                            <span class="mini-count">{{ structure_status.viewer_count }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {% if binder_completeness.missing_items %}
-                <div class="breakdown-box" style="margin-top:16px;">
-                    <h3 style="margin-top:0;">Still Missing</h3>
-                    <div class="tag-list">
-                        {% for item in binder_completeness.missing_items %}
-                            <span class="tag" style="background:#fee2e2;color:#991b1b;">{{ item }}</span>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% else %}
-                <p class="empty" style="font-style:normal;color:#166534;font-weight:700;">This binder has all sponsor-requested core profile fields represented.</p>
-            {% endif %}
         </div>
 
         <div class="card">
             <h2>3D Structure Viewer</h2>
             <p class="section-intro">
-                This viewer prioritizes structures directly linked to the binder. If none are available, it can fall back to structures from linked targets, and finally to a predicted target model when possible.
+                Choose an experimentally linked structure when available. If the protein has no linked PDB structure but does have a UniProt accession, the page falls back to a predicted model. This keeps visual structure exploration available as part of the beta workflow.
             </p>
 
             {% if structure_candidates and default_structure %}
                 <div class="viewer-shell">
                     <div class="viewer-sidebar">
-                        <select class="viewer-select" id="binder-structure-select">
+                        <select class="viewer-select" id="protein-structure-select">
                             {% for item in structure_candidates %}
                                 <option
                                     value="{{ item.viewer_url }}"
@@ -729,20 +550,20 @@
                         </select>
 
                         <div class="viewer-meta">
-                            <h3 id="binder-structure-title">{{ default_structure.title }}</h3>
-                            <p id="binder-structure-subtitle">{{ default_structure.subtitle }}</p>
-                            <p><strong>Source:</strong> <span id="binder-structure-origin">{{ default_structure.origin }}</span></p>
-                            <p><strong>Viewer Entry:</strong> <span id="binder-structure-label">{{ default_structure.label }}</span></p>
+                            <h3 id="protein-structure-title">{{ default_structure.title }}</h3>
+                            <p id="protein-structure-subtitle">{{ default_structure.subtitle }}</p>
+                            <p><strong>Source:</strong> <span id="protein-structure-origin">{{ default_structure.origin }}</span></p>
+                            <p><strong>Viewer Entry:</strong> <span id="protein-structure-label">{{ default_structure.label }}</span></p>
                             <div class="viewer-actions">
                                 <a
-                                    id="binder-structure-open"
+                                    id="protein-structure-open"
                                     class="viewer-link"
                                     href="{{ default_structure.viewer_url }}"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >Open in Mol*</a>
                                 <a
-                                    id="binder-structure-external"
+                                    id="protein-structure-external"
                                     class="viewer-link"
                                     href="{{ default_structure.external_url }}"
                                     target="_blank"
@@ -754,189 +575,225 @@
 
                     <div class="viewer-frame-wrap">
                         <iframe
-                            id="binder-structure-frame"
+                            id="protein-structure-frame"
                             class="viewer-frame"
                             src="{{ default_structure.viewer_url }}"
-                            title="Binder 3D viewer"
+                            title="Protein 3D viewer"
                             loading="lazy"
                             referrerpolicy="no-referrer-when-downgrade"
                         ></iframe>
                     </div>
                 </div>
             {% else %}
-                <p class="empty">No direct or target-linked structure is currently available for this binder.</p>
+                <p class="empty">No linked structure or fallback model is currently available for this protein.</p>
             {% endif %}
         </div>
 
         <div class="main-grid">
             <div class="stack">
                 <div class="card">
-                    <h2>Binder Overview</h2>
-                    <p class="section-intro">
-                        This page treats the binder as the primary object and organizes the rest of the data around what it binds, where it is being validated, and which diseases it is currently linked to.
-                    </p>
+                    <h2>Protein Overview</h2>
                     <div class="info-grid">
-                        <div class="label">Binder Name</div>
-                        <div class="value">{{ binder.binder_name or 'Not available' }}</div>
+                        <div class="label">Gene Symbol</div>
+                        <div class="value">{{ protein.gene_symbol or 'Not available' }}</div>
 
-                        <div class="label">Binder Type</div>
-                        <div class="value">{{ binder.binder_type or 'Not available' }}</div>
+                        <div class="label">Gene Name</div>
+                        <div class="value">{{ protein.gene_name or 'Not available' }}</div>
 
-                        <div class="label">Clinical Status</div>
-                        <div class="value">{{ binder.clinical_status or binder.approval_status or 'Not available' }}</div>
+                        <div class="label">Protein Name</div>
+                        <div class="value">{{ protein.protein_name or 'Not available' }}</div>
 
-                        <div class="label">Modality</div>
-                        <div class="value">{{ binder.modality_name or 'Not available' }}</div>
+                        <div class="label">UniProt Accession</div>
+                        <div class="value">{{ protein.uniprot_accession or 'Not available' }}</div>
 
-                        <div class="label">Approval Status</div>
-                        <div class="value">{{ binder.approval_status or 'Not available' }}</div>
+                        <div class="label">Organism</div>
+                        <div class="value">{{ protein.organism_name or 'Not available' }}</div>
 
-                        <div class="label">Developer</div>
-                        <div class="value">{{ binder.developer_company or 'Not available' }}</div>
+                        <div class="label">Sequence Length</div>
+                        <div class="value">{{ protein.sequence_length or 'Not available' }}</div>
+
+                        <div class="label">Subcellular Location</div>
+                        <div class="value">{{ protein.subcellular_location or 'Not available' }}</div>
                     </div>
                 </div>
 
                 <div class="card">
-                    <h2>Binder Relationship Map</h2>
-                    <p class="section-intro">
-                        This is an MVP exploration view centered on the binder and spread across targets, disease context, and clinical validation.
-                    </p>
-
-                    <div class="relationship-grid">
-                        <div class="center-binder">
-                            <div style="font-size:1.1rem;font-weight:800;">{{ binder.binder_name }}</div>
-                            <div class="binder-type">{{ binder.binder_type or 'Unclassified binder' }}</div>
+                    <h2>Associated Disease Tags</h2>
+                    <p class="section-intro">Disease remains a contextual tagging layer on the target page so users can move from target biology to disease context without making disease the primary organizing pillar.</p>
+                    {% if diseases and diseases|length > 0 %}
+                        <div class="tag-list">
+                            {% for disease in diseases %}
+                                <a class="tag" href="/disease/{{ disease.disease_id }}">{{ disease.disease_name }}</a>
+                            {% endfor %}
                         </div>
-
-                        <div class="relationship-lanes">
-                            <div class="relationship-lane">
-                                <div class="lane-label">Targets</div>
-                                <div class="lane-items">
-                                    {% if proteins and proteins|length > 0 %}
-                                        {% for protein in proteins %}
-                                            <div class="node">
-                                                <a href="/protein/{{ protein.protein_id }}">{{ protein.gene_symbol or protein.protein_name }}</a>
-                                                <small>{{ protein.interaction_type or 'Interaction not available' }}</small>
-                                            </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <div class="node"><small>No linked targets</small></div>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                            <div class="relationship-lane">
-                                <div class="lane-label">Diseases</div>
-                                <div class="lane-items">
-                                    {% if diseases and diseases|length > 0 %}
-                                        {% for disease in diseases %}
-                                            <div class="node">
-                                                <a href="/disease/{{ disease.disease_id }}">{{ disease.disease_name }}</a>
-                                                <small>{{ disease.disease_category or 'Disease tag' }}</small>
-                                            </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <div class="node"><small>No disease tags</small></div>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                            <div class="relationship-lane">
-                                <div class="lane-label">Trials</div>
-                                <div class="lane-items">
-                                    {% if trials and trials|length > 0 %}
-                                        {% for trial in trials[:8] %}
-                                            <div class="node">
-                                                <a href="/trial/{{ trial.trial_id }}">{{ trial.nct_id or trial.trial_title }}</a>
-                                                <small>{{ trial.phase or 'Phase not available' }} · {{ trial.recruitment_status or 'Status not available' }}</small>
-                                            </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <div class="node"><small>No linked trials</small></div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-
-                <div class="card">
-                    <h2>Final Binder-Target Binding Visualization</h2>
-                    <p class="section-intro">
-                        This final visualization completes the sponsor request for the binder page: the selected binder is shown against each linked target protein, with the binding region highlighted in red. Curated binding-site rows are used when available; any inferred regions are clearly marked so the page does not pretend placeholder coordinates are experimental data.
-                    </p>
-
-                    {% if binder_map_summary %}
-                        <div class="viz-summary-grid">
-                            <div class="viz-stat"><strong>{{ binder_map_summary.stats.total_mapped_regions }}</strong><span>Mapped regions</span></div>
-                            <div class="viz-stat"><strong>{{ binder_map_summary.stats.curated_region_count }}</strong><span>Curated regions</span></div>
-                            <div class="viz-stat"><strong>{{ binder_map_summary.stats.inferred_region_count }}</strong><span>Inferred regions</span></div>
-                            <div class="viz-stat"><strong>{{ target_count }}</strong><span>Linked targets</span></div>
-                        </div>
-                        <div class="viz-note"><strong>Map status:</strong> {{ binder_map_summary.summary_text }}</div>
+                    {% else %}
+                        <p class="empty">No associated disease tags found for this target.</p>
                     {% endif %}
+                </div>
 
-                    {% if binder_binding_maps and binder_binding_maps|length > 0 %}
-                        {% for mapping in binder_binding_maps %}
-                            <div class="binding-map-card">
-                                <div class="binding-map-header">
-                                    <div>
-                                        <h3>{{ mapping.protein_label }}</h3>
-                                        <p>{{ mapping.protein_name }}{% if mapping.uniprot_accession %} · UniProt: {{ mapping.uniprot_accession }}{% endif %}</p>
-                                        <p><strong>Interaction:</strong> {{ mapping.interaction_type or 'Interaction not available' }}</p>
-                                        <p><strong>Sequence length:</strong> {{ mapping.sequence_length or 'Not available' }} residues</p>
-                                    </div>
-                                    <span class="map-mode-badge">{{ binder_binding_mode }}</span>
-                                </div>
+                <div class="card">
+                    <h2>Functional Description</h2>
+                    {% if protein.functional_description %}
+                        <div class="text-box">{{ protein.functional_description }}</div>
+                    {% else %}
+                        <p class="empty">No functional description available.</p>
+                    {% endif %}
+                </div>
+            </div>
 
-                                <div class="protein-ruler" aria-label="Binding map for {{ mapping.protein_label }}">
-                                    <div class="protein-axis"></div>
-                                    {% for ann in mapping.annotations %}
-                                        <div class="binding-segment {% if ann.inferred %}inferred{% endif %}"
-                                             title="{{ ann.region_label }}: {{ ann.region_start }}-{{ ann.region_end }}"
-                                             style="--left: {{ ann.left_percent }}%; --width: {{ ann.width_percent }}%; --segment-color: {{ ann.color_hex }};"></div>
-                                        <div class="binding-label" style="--center: {{ ann.center_percent }}%;">{{ ann.region_start }}–{{ ann.region_end }}</div>
-                                    {% endfor %}
-                                </div>
-
-                                <div class="annotation-list">
-                                    {% for ann in mapping.annotations %}
-                                        <div class="annotation-item">
-                                            <div class="annotation-topline">
-                                                <span class="annotation-dot" style="--segment-color: {{ ann.color_hex }};"></span>
-                                                {{ ann.region_label }}
-                                            </div>
-                                            <p><strong>Residues:</strong> {{ ann.region_start }}–{{ ann.region_end }}</p>
-                                            <p><strong>Evidence:</strong>
-                                                <span class="evidence-pill {% if ann.inferred %}inferred{% else %}curated{% endif %}">
-                                                    {{ ann.evidence_type }}
-                                                </span>
-                                            </p>
-                                            <p><strong>Data confidence:</strong> {{ ann.confidence_label }}</p>
-                                            {% if ann.source_note %}<p>{{ ann.source_note }}</p>{% endif %}
+            <div class="stack">
+                <div class="card">
+                    <h2>Binder Landscape for This Target</h2>
+                    <p class="section-intro">The target view summarizes binder classification and development state so the user can quickly see what therapeutic landscape surrounds this protein.</p>
+                    <div class="breakdown-grid">
+                        <div class="breakdown-box">
+                            <h3 style="margin-top:0;">By Binder Type</h3>
+                            {% if binder_type_breakdown %}
+                                <div class="mini-list">
+                                    {% for item in binder_type_breakdown %}
+                                        <div class="mini-row">
+                                            <span class="mini-label">{{ item.label }}</span>
+                                            <span class="mini-count">{{ item.count }}</span>
                                         </div>
                                     {% endfor %}
                                 </div>
+                            {% else %}
+                                <p class="empty">No binder type breakdown available.</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="breakdown-box">
+                            <h3 style="margin-top:0;">By Clinical Status</h3>
+                            {% if binder_status_breakdown %}
+                                <div class="mini-list">
+                                    {% for item in binder_status_breakdown %}
+                                        <div class="mini-row">
+                                            <span class="mini-label">{{ item.label }}</span>
+                                            <span class="mini-count">{{ item.count }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="empty">No clinical status breakdown available.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="card">
+                    <h2>Final Target-Binder Binding Site Map</h2>
+                    <p class="section-intro">
+                        This target-centered visualization completes the sponsor request for the target page: all linked binders are mapped onto the selected protein target, binding regions are shown on the protein ruler, and the page summarizes binder counts, binder categories, and evidence type.
+                    </p>
+
+                    {% if target_visualization_summary %}
+                        <div class="viz-summary-grid">
+                            <div class="viz-stat"><strong>{{ binders|length }}</strong><span>Linked binders</span></div>
+                            <div class="viz-stat"><strong>{{ target_visualization_summary.stats.total_mapped_regions }}</strong><span>Mapped regions</span></div>
+                            <div class="viz-stat"><strong>{{ target_visualization_summary.stats.curated_region_count }}</strong><span>Curated regions</span></div>
+                            <div class="viz-stat"><strong>{{ target_visualization_summary.stats.inferred_region_count }}</strong><span>Inferred regions</span></div>
+                        </div>
+                        <div class="viz-note"><strong>Map status:</strong> {{ target_visualization_summary.summary_text }}</div>
+
+                        <div class="viz-breakdowns">
+                            <div class="viz-breakdown-box">
+                                <h4>Binder Categories</h4>
+                                {% if target_visualization_summary.stats.binder_type_breakdown %}
+                                    <div class="mini-list">
+                                        {% for item in target_visualization_summary.stats.binder_type_breakdown %}
+                                            <div class="mini-row"><span class="mini-label">{{ item.label }}</span><span class="mini-count">{{ item.count }}</span></div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="empty">No binder category data available.</p>
+                                {% endif %}
                             </div>
-                        {% endfor %}
+                            <div class="viz-breakdown-box">
+                                <h4>Evidence Levels</h4>
+                                {% if target_visualization_summary.stats.evidence_breakdown %}
+                                    <div class="mini-list">
+                                        {% for item in target_visualization_summary.stats.evidence_breakdown %}
+                                            <div class="mini-row"><span class="mini-label">{{ item.label }}</span><span class="mini-count">{{ item.count }}</span></div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="empty">No evidence breakdown available.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if binding_site_annotations and binding_site_annotations|length > 0 %}
+                        <div class="binding-map-card">
+                            <div class="binding-map-header">
+                                <div>
+                                    <h3>{{ protein.gene_symbol or protein.protein_name }}</h3>
+                                    <p>{{ protein.protein_name }}{% if protein.uniprot_accession %} · UniProt: {{ protein.uniprot_accession }}{% endif %}</p>
+                                    <p><strong>Sequence length:</strong> {{ protein.sequence_length or 'Not available' }}</p>
+                                </div>
+                                <span class="map-mode-badge">{{ binding_site_mode }}</span>
+                            </div>
+
+                            <div class="protein-ruler" aria-label="Binding site map for {{ protein.gene_symbol or protein.protein_name }}">
+                                <div class="protein-axis"></div>
+                                {% for ann in binding_site_annotations %}
+                                    <div class="binding-segment binding-map-item {% if ann.inferred %}inferred{% endif %} {% if loop.index > 5 %}is-hidden{% endif %}"
+                                         title="{{ ann.binder_name }}: {{ ann.region_start }}-{{ ann.region_end }}"
+                                         style="--left: {{ ann.left_percent }}%; --width: {{ ann.width_percent }}%; --segment-color: {{ ann.color_hex }};"></div>
+                                    <div class="binding-label binding-map-item {% if loop.index > 5 %}is-hidden{% endif %}" style="--center: {{ ann.center_percent }}%;">{{ ann.region_start }}–{{ ann.region_end }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="annotation-list" id="binding-annotation-list" data-page-size="5">
+                                {% for ann in binding_site_annotations %}
+                                    <div class="annotation-item binding-annotation-item {% if loop.index > 5 %}is-hidden{% endif %}">
+                                        <div class="annotation-topline">
+                                            <span class="annotation-dot" style="--segment-color: {{ ann.color_hex }};"></span>
+                                            <a href="/binder/{{ ann.binder_id }}">{{ ann.binder_name }}</a>
+                                        </div>
+                                        <p><strong>Binder type:</strong> {{ ann.binder_type or 'Not available' }}</p>
+                                        <p><strong>Mapped region:</strong> {{ ann.region_start }}–{{ ann.region_end }}</p>
+                                        <p><strong>Region label:</strong> {{ ann.region_label }}</p>
+                                        <p><strong>Evidence:</strong>
+                                            <span class="evidence-pill {% if ann.inferred %}inferred{% else %}curated{% endif %}">
+                                                {{ ann.evidence_type }}
+                                            </span>
+                                        </p>
+                                        <p><strong>Data confidence:</strong> {{ ann.confidence_label or 'Not available' }}</p>
+                                        {% if ann.source_note %}<p>{{ ann.source_note }}</p>{% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            {% if binding_site_annotations|length > 5 %}
+                                <div class="show-more-panel" id="binding-annotation-controls">
+                                    <span class="show-more-status" id="binding-annotation-status">
+                                        Showing 5 of {{ binding_site_annotations|length }} binders
+                                    </span>
+                                    <button type="button" class="show-more-button" id="binding-annotation-show-more">
+                                        Show More Binders
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
                     {% else %}
-                        <p class="empty">No binder-target map is available because this binder has no linked targets.</p>
+                        <p class="empty">No target-binder binding annotations are available for this protein yet.</p>
                     {% endif %}
                 </div>
                 <div class="card">
-                    <h2>3D Binder-Target Highlighting</h2>
+                    <h2>3D Binding-Site Highlighting</h2>
                     <p class="section-intro">
-                        This viewer loads a linked target or binder structure and highlights the residue regions connected to this binder.
-                        The highlighted regions match the binding-site annotations used in the 2D visualization.
+                        This viewer loads a protein structure and highlights the mapped binder interaction regions directly on the 3D model.
+                        It uses curated binding-site data when available and inferred regions when exact residue-level annotations are not stored yet.
                     </p>
 
-                    {% if structure_candidates and structure_candidates|length > 0 and binder_3d_annotations and binder_3d_annotations|length > 0 %}
+                    {% if structure_candidates and structure_candidates|length > 0 and binding_site_annotations and binding_site_annotations|length > 0 %}
                         <div
                             class="three-d-card"
                             data-binding-3d-viewer
                             data-structures='{{ structure_candidates|tojson }}'
-                            data-annotations='{{ binder_3d_annotations|tojson }}'
+                            data-annotations='{{ binding_site_annotations|tojson }}'
                         >
                             <div class="three-d-toolbar">
                                 <div>
@@ -955,154 +812,93 @@
                                 Preparing 3D structure viewer...
                             </div>
 
-                            <div class="three-d-annotation-list" data-annotation-list></div>
+                            <div class="three-d-annotation-list" data-annotation-list data-page-size="5"></div>
+
+                            <div class="show-more-panel" data-three-d-annotation-controls hidden>
+                                <span class="show-more-status" data-three-d-annotation-status>Showing 5 binding regions</span>
+                                <button type="button" class="show-more-button" data-three-d-annotation-show-more>
+                                    Show More 3D Binding Sites
+                                </button>
+                            </div>
                         </div>
                     {% else %}
                         <p class="empty">
                             3D highlighting needs both a structure candidate and binding-site annotations.
-                            The 2D binder-target map is still available.
+                            The 2D binding map is still available for this target.
                         </p>
                     {% endif %}
                 </div>
 
 
                 <div class="card">
-                    <h2>Current Disease Tag Context</h2>
-                    <p class="section-intro">
-                        Diseases are shown as associated tags and context, not as the top-level organizing structure. Binder classification is centered on the sponsor MVP classes of IgG, VHH, and Peptide.
-                    </p>
-                    {% if diseases and diseases|length > 0 %}
-                        <div class="tag-list">
-                            {% for disease in diseases %}
-                                <a class="tag" href="/disease/{{ disease.disease_id }}">{{ disease.disease_name }}</a>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="empty">No disease tags are currently linked to this binder yet.</p>
-                    {% endif %}
-                </div>
-
-                <div class="card">
-                    <h2>Description</h2>
-                    {% if binder.binder_description %}
-                        <div class="text-box">{{ binder.binder_description }}</div>
-                    {% else %}
-                        <p class="empty">No binder description is currently available.</p>
-                    {% endif %}
-                </div>
-
-                <div class="card">
-                    <h2>Mechanism of Action</h2>
-                    {% if binder.mechanism_of_action %}
-                        <div class="text-box">{{ binder.mechanism_of_action }}</div>
-                    {% else %}
-                        <p class="empty">No mechanism of action is currently available.</p>
-                    {% endif %}
-                </div>
-
-                <div class="card">
-                    <h2>Sequence</h2>
-                    {% if binder.sequence %}
-                        <div class="sequence-box">{{ binder.sequence }}</div>
-                    {% else %}
-                        <p class="empty">No sequence is currently available for this binder.</p>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="stack">
-                <div class="card">
-                    <h2>Linked Targets</h2>
-                    {% if proteins and proteins|length > 0 %}
-                        <div class="list">
-                            {% for protein in proteins %}
-                                <div class="list-item">
-                                    <h3>
-                                        <a href="/protein/{{ protein.protein_id }}">
-                                            {{ protein.gene_symbol or protein.protein_name }}
-                                        </a>
-                                    </h3>
-                                    <p><strong>Protein Name:</strong> {{ protein.protein_name or 'Not available' }}</p>
-                                    <p><strong>Gene Symbol:</strong> {{ protein.gene_symbol or 'Not available' }}</p>
-                                    <p><strong>Interaction Type:</strong> {{ protein.interaction_type or 'Not available' }}</p>
-                                    <p><strong>UniProt:</strong> {{ protein.uniprot_accession or 'Not available' }}</p>
+                    <h2>Linked Binders</h2>
+                    {% if binders and binders|length > 0 %}
+                        <div class="list show-more-list" data-page-size="5" data-show-more-label="binders">
+                            {% for binder in binders %}
+                                <div class="list-item show-more-item {% if loop.index > 5 %}is-hidden{% endif %}">
+                                    <h3><a href="/binder/{{ binder.binder_id }}">{{ binder.binder_name }}</a></h3>
+                                    <p><strong>Binder Type:</strong> {{ binder.binder_type or 'Not available' }}</p>
+                                    <p><strong>Clinical Status:</strong> {{ binder.clinical_status or binder.approval_status or 'Not available' }}</p>
+                                    <p><strong>Modality:</strong> {{ binder.modality_name or 'Not available' }}</p>
+                                    <p><strong>Interaction Type:</strong> {{ binder.interaction_type or 'Not available' }}</p>
                                 </div>
                             {% endfor %}
                         </div>
-                        {% if proteins_pagination and (proteins_pagination.has_prev or proteins_pagination.has_next) %}<div class="pagination-actions">{% if proteins_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('proteins_page', proteins_pagination.prev_page) }}">Previous Targets</a>{% endif %}<span class="pagination-status">Showing {{ proteins_pagination.showing }} of {{ proteins_pagination.total }} targets</span>{% if proteins_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('proteins_page', proteins_pagination.next_page) }}">Load More Targets</a>{% endif %}</div>{% endif %}
+                        {% if binders|length > 5 %}
+                            <div class="show-more-panel">
+                                <span class="show-more-status" data-show-more-status>Showing 5 of {{ binders|length }} binders</span>
+                                <button type="button" class="show-more-button" data-show-more-button>Show More Binders</button>
+                            </div>
+                        {% endif %}
+                        {% if binders_pagination and (binders_pagination.has_prev or binders_pagination.has_next) %}
+                            <div class="pagination-actions">
+                                {% if binders_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('binders_page', binders_pagination.prev_page) }}">Previous Binders</a>{% endif %}
+                                <span class="pagination-status">Showing page results {{ binders_pagination.showing }} of {{ binders_pagination.total }} binders</span>
+                                {% if binders_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('binders_page', binders_pagination.next_page) }}">Load More Binder Page</a>{% endif %}
+                            </div>
+                        {% endif %}
                     {% else %}
-                        <p class="empty">No linked targets were found for this binder.</p>
+                        <p class="empty">No linked binders found.</p>
                     {% endif %}
-                </div>
-
-                <div class="card">
-                    <h2>Clinical Validation</h2>
-                    <div class="breakdown-grid">
-                        <div class="breakdown-box">
-                            <h3 style="margin-top:0;">Trials by Phase</h3>
-                            {% if trial_phase_breakdown %}
-                                <div class="mini-list">
-                                    {% for item in trial_phase_breakdown %}
-                                        <div class="mini-row">
-                                            <span class="mini-label">{{ item.label }}</span>
-                                            <span class="mini-count">{{ item.count }}</span>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="empty">No linked clinical trials found.</p>
-                            {% endif %}
-                        </div>
-
-                        <div class="breakdown-box">
-                            <h3 style="margin-top:0;">Disease Categories</h3>
-                            {% if disease_category_breakdown %}
-                                <div class="mini-list">
-                                    {% for item in disease_category_breakdown %}
-                                        <div class="mini-row">
-                                            <span class="mini-label">{{ item.label }}</span>
-                                            <span class="mini-count">{{ item.count }}</span>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="empty">No disease category breakdown available.</p>
-                            {% endif %}
-                        </div>
-                    </div>
                 </div>
 
                 <div class="card">
                     <h2>Linked Clinical Trials</h2>
                     {% if trials and trials|length > 0 %}
-                        <div class="list">
+                        <div class="list show-more-list" data-page-size="5" data-show-more-label="trials">
                             {% for trial in trials %}
-                                <div class="list-item">
-                                    <h3>
-                                        <a href="/trial/{{ trial.trial_id }}">
-                                            {{ trial.nct_id or trial.trial_title }}
-                                        </a>
-                                    </h3>
-                                    <p><strong>Trial Title:</strong> {{ trial.trial_title or 'Not available' }}</p>
+                                <div class="list-item show-more-item {% if loop.index > 5 %}is-hidden{% endif %}">
+                                    <h3><a href="/trial/{{ trial.trial_id }}">{{ trial.nct_id or trial.trial_title }}</a></h3>
                                     <p><strong>Condition:</strong> {{ trial.condition_name or 'Not available' }}</p>
                                     <p><strong>Phase:</strong> {{ trial.phase or 'Not available' }}</p>
                                     <p><strong>Recruitment Status:</strong> {{ trial.recruitment_status or 'Not available' }}</p>
-                                    <p><strong>Sponsor:</strong> {{ trial.sponsor_name or 'Not available' }}</p>
                                 </div>
                             {% endfor %}
                         </div>
-                        {% if trials_pagination and (trials_pagination.has_prev or trials_pagination.has_next) %}<div class="pagination-actions">{% if trials_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.prev_page) }}">Previous Trials</a>{% endif %}<span class="pagination-status">Showing {{ trials_pagination.showing }} of {{ trials_pagination.total }} trials</span>{% if trials_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.next_page) }}">Load More Trials</a>{% endif %}</div>{% endif %}
+                        {% if trials|length > 5 %}
+                            <div class="show-more-panel">
+                                <span class="show-more-status" data-show-more-status>Showing 5 of {{ trials|length }} trials</span>
+                                <button type="button" class="show-more-button" data-show-more-button>Show More Trials</button>
+                            </div>
+                        {% endif %}
+                        {% if trials_pagination and (trials_pagination.has_prev or trials_pagination.has_next) %}
+                            <div class="pagination-actions">
+                                {% if trials_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.prev_page) }}">Previous Trials</a>{% endif %}
+                                <span class="pagination-status">Showing page results {{ trials_pagination.showing }} of {{ trials_pagination.total }} trials</span>
+                                {% if trials_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.next_page) }}">Load More Trial Page</a>{% endif %}
+                            </div>
+                        {% endif %}
                     {% else %}
-                        <p class="empty">No linked clinical trials were found for this binder.</p>
+                        <p class="empty">No linked trials found.</p>
                     {% endif %}
                 </div>
 
                 <div class="card">
-                    <h2>Directly Linked Structures</h2>
+                    <h2>Linked Structures</h2>
                     {% if structures and structures|length > 0 %}
-                        <div class="list">
+                        <div class="list show-more-list" data-page-size="5" data-show-more-label="structures">
                             {% for structure in structures %}
-                                <div class="list-item">
+                                <div class="list-item show-more-item {% if loop.index > 5 %}is-hidden{% endif %}">
                                     <h3>{{ structure.pdb_id or 'Unknown PDB ID' }}</h3>
                                     <p><strong>Title:</strong> {{ structure.structure_title or 'Not available' }}</p>
                                     <p><strong>Experimental Method:</strong> {{ structure.experimental_method or 'Not available' }}</p>
@@ -1110,40 +906,22 @@
                                 </div>
                             {% endfor %}
                         </div>
-                        {% if structures_pagination and (structures_pagination.has_prev or structures_pagination.has_next) %}<div class="pagination-actions">{% if structures_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.prev_page) }}">Previous Structures</a>{% endif %}<span class="pagination-status">Showing {{ structures_pagination.showing }} of {{ structures_pagination.total }} structures</span>{% if structures_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.next_page) }}">Load More Structures</a>{% endif %}</div>{% endif %}
+                        {% if structures|length > 5 %}
+                            <div class="show-more-panel">
+                                <span class="show-more-status" data-show-more-status>Showing 5 of {{ structures|length }} structures</span>
+                                <button type="button" class="show-more-button" data-show-more-button>Show More Structures</button>
+                            </div>
+                        {% endif %}
+                        {% if structures_pagination and (structures_pagination.has_prev or structures_pagination.has_next) %}
+                            <div class="pagination-actions">
+                                {% if structures_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.prev_page) }}">Previous Structures</a>{% endif %}
+                                <span class="pagination-status">Showing page results {{ structures_pagination.showing }} of {{ structures_pagination.total }} structures</span>
+                                {% if structures_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.next_page) }}">Load More Structure Page</a>{% endif %}
+                            </div>
+                        {% endif %}
                     {% else %}
-                        <p class="empty">No direct binder structures were found. The viewer may still show target-linked or fallback entries.</p>
+                        <p class="empty">No linked experimental structures found. The viewer may still show a fallback model.</p>
                     {% endif %}
-                </div>
-
-                <div class="card">
-                    <h2>Related Binders</h2>
-                    <p class="section-intro">
-                        These are nearby binders that share either linked targets or disease context with the current binder.
-                    </p>
-                    {% if related_binders and related_binders|length > 0 %}
-                        <div class="list">
-                            {% for item in related_binders %}
-                                <div class="list-item">
-                                    <h3><a href="/binder/{{ item.binder_id }}">{{ item.binder_name }}</a></h3>
-                                    <p><strong>Binder Type:</strong> {{ item.binder_type or 'Not available' }}</p>
-                                    <p><strong>Clinical Status:</strong> {{ item.clinical_status or 'Not available' }}</p>
-                                    <p><strong>Modality:</strong> {{ item.modality_name or 'Not available' }}</p>
-                                </div>
-                            {% endfor %}
-                        </div>
-                        {% if related_binders_pagination and (related_binders_pagination.has_prev or related_binders_pagination.has_next) %}<div class="pagination-actions">{% if related_binders_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('related_binders_page', related_binders_pagination.prev_page) }}">Previous Related Binders</a>{% endif %}<span class="pagination-status">Showing {{ related_binders_pagination.showing }} of {{ related_binders_pagination.total }} related binders</span>{% if related_binders_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('related_binders_page', related_binders_pagination.next_page) }}">Load More Related Binders</a>{% endif %}</div>{% endif %}
-                    {% else %}
-                        <p class="empty">No related binders are currently available.</p>
-                    {% endif %}
-                </div>
-
-                <div class="card">
-                    <h2>Notes</h2>
-                    <p class="side-note">
-                        This version combines binder-centric relationship exploration with an embedded 3D structure viewer so users can inspect the object they are researching without leaving the app.
-                    </p>
-                    <a class="back-link" href="/">← Return to Search</a>
                 </div>
             </div>
         </div>
@@ -1152,14 +930,14 @@
     {% if structure_candidates and default_structure %}
     <script>
         (function () {
-            const select = document.getElementById('binder-structure-select');
-            const frame = document.getElementById('binder-structure-frame');
-            const title = document.getElementById('binder-structure-title');
-            const subtitle = document.getElementById('binder-structure-subtitle');
-            const origin = document.getElementById('binder-structure-origin');
-            const label = document.getElementById('binder-structure-label');
-            const openLink = document.getElementById('binder-structure-open');
-            const externalLink = document.getElementById('binder-structure-external');
+            const select = document.getElementById('protein-structure-select');
+            const frame = document.getElementById('protein-structure-frame');
+            const title = document.getElementById('protein-structure-title');
+            const subtitle = document.getElementById('protein-structure-subtitle');
+            const origin = document.getElementById('protein-structure-origin');
+            const label = document.getElementById('protein-structure-label');
+            const openLink = document.getElementById('protein-structure-open');
+            const externalLink = document.getElementById('protein-structure-external');
 
             if (!select) return;
 
@@ -1176,6 +954,106 @@
         })();
     </script>
     {% endif %}
+
+<script>
+    (function () {
+        function setupShowMoreList(list, itemSelector, button, status, label, relatedItems) {
+            if (!list || !button) return;
+
+            const pageSize = parseInt(list.dataset.pageSize || '5', 10);
+            const items = Array.from(list.querySelectorAll(itemSelector));
+            const extraItems = relatedItems || [];
+            let visibleCount = Math.min(pageSize, items.length);
+
+            function updateVisibleItems() {
+                items.forEach((item, index) => {
+                    item.classList.toggle('is-hidden', index >= visibleCount);
+                });
+
+                extraItems.forEach((item, index) => {
+                    item.classList.toggle('is-hidden', index >= visibleCount);
+                });
+
+                if (status) {
+                    status.textContent = `Showing ${Math.min(visibleCount, items.length)} of ${items.length} ${label}`;
+                }
+
+                button.hidden = visibleCount >= items.length;
+            }
+
+            button.addEventListener('click', function () {
+                visibleCount = Math.min(visibleCount + pageSize, items.length);
+                updateVisibleItems();
+            });
+
+            updateVisibleItems();
+        }
+
+        const annotationList = document.getElementById('binding-annotation-list');
+        const annotationButton = document.getElementById('binding-annotation-show-more');
+        const annotationStatus = document.getElementById('binding-annotation-status');
+        const mapItems = Array.from(document.querySelectorAll('.binding-map-item'));
+        setupShowMoreList(
+            annotationList,
+            '.binding-annotation-item',
+            annotationButton,
+            annotationStatus,
+            'binders',
+            mapItems
+        );
+
+        document.querySelectorAll('.show-more-list').forEach(function (list) {
+            const panel = list.nextElementSibling;
+            if (!panel || !panel.classList.contains('show-more-panel')) return;
+
+            const button = panel.querySelector('[data-show-more-button]');
+            const status = panel.querySelector('[data-show-more-status]');
+            const label = list.dataset.showMoreLabel || 'items';
+
+            setupShowMoreList(list, '.show-more-item', button, status, label);
+        });
+
+        function setupThreeDShowMore() {
+            const list = document.querySelector('[data-annotation-list]');
+            const controls = document.querySelector('[data-three-d-annotation-controls]');
+            if (!list || !controls) return;
+
+            const button = controls.querySelector('[data-three-d-annotation-show-more]');
+            const status = controls.querySelector('[data-three-d-annotation-status]');
+            const rows = Array.from(list.querySelectorAll('.three-d-annotation-row'));
+            const pageSize = parseInt(list.dataset.pageSize || '5', 10);
+            let visibleCount = Math.min(pageSize, rows.length);
+
+            function updateThreeDVisibleItems() {
+                rows.forEach((row, index) => {
+                    row.classList.toggle('is-hidden', index >= visibleCount);
+                });
+
+                if (status) {
+                    status.textContent = `Showing ${Math.min(visibleCount, rows.length)} of ${rows.length} 3D binding sites`;
+                }
+
+                controls.hidden = rows.length <= pageSize;
+                if (button) {
+                    button.hidden = visibleCount >= rows.length;
+                    button.onclick = function () {
+                        visibleCount = Math.min(visibleCount + pageSize, rows.length);
+                        updateThreeDVisibleItems();
+                    };
+                }
+            }
+
+            updateThreeDVisibleItems();
+        }
+
+        const threeDList = document.querySelector('[data-annotation-list]');
+        if (threeDList) {
+            const observer = new MutationObserver(setupThreeDShowMore);
+            observer.observe(threeDList, { childList: true });
+            setupThreeDShowMore();
+        }
+    })();
+</script>
 <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
 <script src="{{ url_for('static', filename='js/binding_3d_highlight.js') }}"></script>
 </body>
