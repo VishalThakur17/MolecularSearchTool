@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ protein.gene_symbol or protein.protein_name }} | Molecular Search Tool</title>
+    <title>{{ binder.binder_name or "Binder Detail" }} | Molecular Search Tool</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -506,34 +506,35 @@
 <body>
     <div class="navbar">
         <a href="/">Molecular Search Tool</a>
-        <a href="/">Back to Search</a>
+        <a href="/binders">Browse Binders</a>
     </div>
 
     <div class="page">
         <div class="hero">
-            <h1>{{ protein.gene_symbol or protein.protein_name }}</h1>
+            <h1>{{ binder.binder_name or 'Binder Detail' }}</h1>
             <p class="subtitle">
-                This target page keeps the therapeutic layer visible while also letting the user inspect linked binders, disease tags, clinical evidence, and a 3D structure or fallback model directly inside the application.
+                This binder page treats the therapeutic molecule as a first-class entity. It summarizes classification, target links, disease context, clinical evidence, sequence availability, and 2D/3D binding visualization when data is available.
             </p>
             <div class="badge-row">
-                <span class="badge">UniProt: {{ protein.uniprot_accession or 'Not available' }}</span>
-                <span class="badge">Organism: {{ protein.organism_name or 'Not available' }}</span>
-                <span class="badge">Linked Binders: {{ binders|length if binders else 0 }}</span>
-                <span class="badge">Linked Trials: {{ trials|length if trials else 0 }}</span>
+                <span class="badge">Type: {{ binder.binder_type or 'Not available' }}</span>
+                <span class="badge">Clinical Status: {{ binder.clinical_status or binder.approval_status or 'Not available' }}</span>
+                <span class="badge">Targets: {{ target_count or 0 }}</span>
+                <span class="badge">Trials: {{ trial_count or 0 }}</span>
+                <span class="badge">Disease Tags: {{ disease_count or 0 }}</span>
                 <span class="badge">Structures in Viewer: {{ structure_candidates|length if structure_candidates else 0 }}</span>
             </div>
         </div>
 
         <div class="card">
-            <h2>3D Structure Viewer</h2>
+            <h2>3D Binder/Target Structure Viewer</h2>
             <p class="section-intro">
-                Choose an experimentally linked structure when available. If the protein has no linked PDB structure but does have a UniProt accession, the page falls back to a predicted model. This keeps visual structure exploration available as part of the beta workflow.
+                This viewer uses direct binder structures when available. If no direct binder structure exists, the page uses target-linked structures or an AlphaFold fallback model when possible.
             </p>
 
             {% if structure_candidates and default_structure %}
                 <div class="viewer-shell">
                     <div class="viewer-sidebar">
-                        <select class="viewer-select" id="protein-structure-select">
+                        <select class="viewer-select" id="binder-structure-select">
                             {% for item in structure_candidates %}
                                 <option
                                     value="{{ item.viewer_url }}"
@@ -550,355 +551,444 @@
                         </select>
 
                         <div class="viewer-meta">
-                            <h3 id="protein-structure-title">{{ default_structure.title }}</h3>
-                            <p id="protein-structure-subtitle">{{ default_structure.subtitle }}</p>
-                            <p><strong>Source:</strong> <span id="protein-structure-origin">{{ default_structure.origin }}</span></p>
-                            <p><strong>Viewer Entry:</strong> <span id="protein-structure-label">{{ default_structure.label }}</span></p>
+                            <h3 id="binder-structure-title">{{ default_structure.title }}</h3>
+                            <p id="binder-structure-subtitle">{{ default_structure.subtitle }}</p>
+                            <p><strong>Source:</strong> <span id="binder-structure-origin">{{ default_structure.origin }}</span></p>
+                            <p><strong>Viewer Entry:</strong> <span id="binder-structure-label">{{ default_structure.label }}</span></p>
                             <div class="viewer-actions">
-                                <a
-                                    id="protein-structure-open"
-                                    class="viewer-link"
-                                    href="{{ default_structure.viewer_url }}"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >Open in Mol*</a>
-                                <a
-                                    id="protein-structure-external"
-                                    class="viewer-link"
-                                    href="{{ default_structure.external_url }}"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >Open Source Record</a>
+                                <a id="binder-structure-open" class="viewer-link" href="{{ default_structure.viewer_url }}" target="_blank" rel="noopener noreferrer">Open in Mol*</a>
+                                <a id="binder-structure-external" class="viewer-link" href="{{ default_structure.external_url }}" target="_blank" rel="noopener noreferrer">Open Source Record</a>
                             </div>
                         </div>
                     </div>
 
                     <div class="viewer-frame-wrap">
                         <iframe
-                            id="protein-structure-frame"
+                            id="binder-structure-frame"
                             class="viewer-frame"
                             src="{{ default_structure.viewer_url }}"
-                            title="Protein 3D viewer"
+                            title="Binder structure viewer"
                             loading="lazy"
                             referrerpolicy="no-referrer-when-downgrade"
                         ></iframe>
                     </div>
                 </div>
             {% else %}
-                <p class="empty">No linked structure or fallback model is currently available for this protein.</p>
+                <p class="empty">No direct, target-linked, or fallback structure is currently available for this binder.</p>
             {% endif %}
         </div>
 
         <div class="main-grid">
             <div class="stack">
                 <div class="card">
-                    <h2>Protein Overview</h2>
+                    <h2>Binder Overview</h2>
                     <div class="info-grid">
-                        <div class="label">Gene Symbol</div>
-                        <div class="value">{{ protein.gene_symbol or 'Not available' }}</div>
+                        <div class="label">Binder Name</div>
+                        <div class="value">{{ binder.binder_name or 'Not available' }}</div>
 
-                        <div class="label">Gene Name</div>
-                        <div class="value">{{ protein.gene_name or 'Not available' }}</div>
+                        <div class="label">Binder Type</div>
+                        <div class="value">{{ binder.binder_type or 'Not available' }}</div>
 
-                        <div class="label">Protein Name</div>
-                        <div class="value">{{ protein.protein_name or 'Not available' }}</div>
+                        <div class="label">Modality</div>
+                        <div class="value">{{ binder.modality_name or 'Not available' }}</div>
 
-                        <div class="label">UniProt Accession</div>
-                        <div class="value">{{ protein.uniprot_accession or 'Not available' }}</div>
+                        <div class="label">Clinical Status</div>
+                        <div class="value">{{ binder.clinical_status or 'Not available' }}</div>
 
-                        <div class="label">Organism</div>
-                        <div class="value">{{ protein.organism_name or 'Not available' }}</div>
+                        <div class="label">Approval Status</div>
+                        <div class="value">{{ binder.approval_status or 'Not available' }}</div>
+
+                        <div class="label">Developer</div>
+                        <div class="value">{{ binder.developer_company or 'Not available' }}</div>
 
                         <div class="label">Sequence Length</div>
-                        <div class="value">{{ protein.sequence_length or 'Not available' }}</div>
-
-                        <div class="label">Subcellular Location</div>
-                        <div class="value">{{ protein.subcellular_location or 'Not available' }}</div>
+                        <div class="value">{{ sequence_length or 'Not available' }}</div>
                     </div>
                 </div>
 
                 <div class="card">
-                    <h2>Associated Disease Tags</h2>
-                    <p class="section-intro">Disease remains a contextual tagging layer on the target page so users can move from target biology to disease context without making disease the primary organizing pillar.</p>
-                    {% if diseases and diseases|length > 0 %}
-                        <div class="tag-list">
-                            {% for disease in diseases %}
-                                <a class="tag" href="/disease/{{ disease.disease_id }}">{{ disease.disease_name }}</a>
-                            {% endfor %}
-                        </div>
+                    <h2>Binder Summary</h2>
+                    {% if binder_story %}
+                        <div class="text-box">{{ binder_story }}</div>
                     {% else %}
-                        <p class="empty">No associated disease tags found for this target.</p>
+                        <p class="empty">No binder summary is available.</p>
                     {% endif %}
                 </div>
 
                 <div class="card">
-                    <h2>Functional Description</h2>
-                    {% if protein.functional_description %}
-                        <div class="text-box">{{ protein.functional_description }}</div>
+                    <h2>Description</h2>
+                    {% if binder.binder_description %}
+                        <div class="text-box">{{ binder.binder_description }}</div>
                     {% else %}
-                        <p class="empty">No functional description available.</p>
+                        <p class="empty">No binder description available.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Mechanism of Action</h2>
+                    {% if binder.mechanism_of_action %}
+                        <div class="text-box">{{ binder.mechanism_of_action }}</div>
+                    {% else %}
+                        <p class="empty">No mechanism of action is currently available.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Sequence / FASTA</h2>
+                    {% if binder.sequence %}
+                        <pre class="sequence-box">{{ binder.sequence }}</pre>
+                    {% elif sequence_note %}
+                        <p class="empty">{{ sequence_note }}</p>
+                    {% else %}
+                        <p class="empty">No sequence is currently available for this binder.</p>
                     {% endif %}
                 </div>
             </div>
 
             <div class="stack">
                 <div class="card">
-                    <h2>Binder Landscape for This Target</h2>
-                    <p class="section-intro">The target view summarizes binder classification and development state so the user can quickly see what therapeutic landscape surrounds this protein.</p>
-                    <div class="breakdown-grid">
-                        <div class="breakdown-box">
-                            <h3 style="margin-top:0;">By Binder Type</h3>
-                            {% if binder_type_breakdown %}
-                                <div class="mini-list">
-                                    {% for item in binder_type_breakdown %}
-                                        <div class="mini-row">
-                                            <span class="mini-label">{{ item.label }}</span>
-                                            <span class="mini-count">{{ item.count }}</span>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="empty">No binder type breakdown available.</p>
-                            {% endif %}
-                        </div>
+                    <h2>Binder Classification</h2>
+                    <p class="section-intro">This section maps the binder into the sponsor taxonomy and shows how complete the current binder record is.</p>
 
-                        <div class="breakdown-box">
-                            <h3 style="margin-top:0;">By Clinical Status</h3>
-                            {% if binder_status_breakdown %}
+                    {% if binder_classification %}
+                        <div class="breakdown-grid">
+                            <div class="breakdown-box">
+                                <h3 style="margin-top:0;">Classification</h3>
                                 <div class="mini-list">
-                                    {% for item in binder_status_breakdown %}
-                                        <div class="mini-row">
-                                            <span class="mini-label">{{ item.label }}</span>
-                                            <span class="mini-count">{{ item.count }}</span>
-                                        </div>
-                                    {% endfor %}
+                                    <div class="mini-row"><span class="mini-label">Canonical Type</span><span class="mini-count">{{ binder_classification.binder_type_label or binder.binder_type or 'Unknown' }}</span></div>
+                                    <div class="mini-row"><span class="mini-label">Family</span><span class="mini-count">{{ binder_classification.class_family or 'Not available' }}</span></div>
+                                    <div class="mini-row"><span class="mini-label">Sponsor Primary Class</span><span class="mini-count">{{ 'Yes' if binder_classification.is_primary_class else 'No' }}</span></div>
                                 </div>
-                            {% else %}
-                                <p class="empty">No clinical status breakdown available.</p>
-                            {% endif %}
+                            </div>
+                            <div class="breakdown-box">
+                                <h3 style="margin-top:0;">Linked Evidence</h3>
+                                <div class="mini-list">
+                                    <div class="mini-row"><span class="mini-label">Targets</span><span class="mini-count">{{ target_count or 0 }}</span></div>
+                                    <div class="mini-row"><span class="mini-label">Clinical Trials</span><span class="mini-count">{{ trial_count or 0 }}</span></div>
+                                    <div class="mini-row"><span class="mini-label">Disease Tags</span><span class="mini-count">{{ disease_count or 0 }}</span></div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    {% else %}
+                        <p class="empty">No classification summary is available.</p>
+                    {% endif %}
                 </div>
 
+                <div class="card">
+                    <h2>Record Completeness</h2>
+                    {% if binder_completeness %}
+                        <div class="breakdown-box">
+                            <h3 style="margin-top:0;">{{ binder_completeness.score }}% Complete</h3>
+                            <p class="section-intro">{{ binder_completeness.present_count }} of {{ binder_completeness.total_count }} expected fields are available.</p>
+                        </div>
+                        <div class="breakdown-grid">
+                            <div class="breakdown-box">
+                                <h3 style="margin-top:0;">Available</h3>
+                                {% if binder_completeness.present_items %}
+                                    <div class="tag-list">
+                                        {% for item in binder_completeness.present_items %}<span class="tag">{{ item }}</span>{% endfor %}
+                                    </div>
+                                {% else %}<p class="empty">No complete fields found.</p>{% endif %}
+                            </div>
+                            <div class="breakdown-box">
+                                <h3 style="margin-top:0;">Missing</h3>
+                                {% if binder_completeness.missing_items %}
+                                    <div class="tag-list">
+                                        {% for item in binder_completeness.missing_items %}<span class="tag">{{ item }}</span>{% endfor %}
+                                    </div>
+                                {% else %}<p class="empty">No missing fields.</p>{% endif %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="empty">No completeness summary available.</p>
+                    {% endif %}
+                </div>
 
                 <div class="card">
-                    <h2>Final Target-Binder Binding Site Map</h2>
-                    <p class="section-intro">
-                        This target-centered visualization completes the sponsor request for the target page: all linked binders are mapped onto the selected protein target, binding regions are shown on the protein ruler, and the page summarizes binder counts, binder categories, and evidence type.
-                    </p>
-
-                    {% if target_visualization_summary %}
-                        <div class="viz-summary-grid">
-                            <div class="viz-stat"><strong>{{ binders|length }}</strong><span>Linked binders</span></div>
-                            <div class="viz-stat"><strong>{{ target_visualization_summary.stats.total_mapped_regions }}</strong><span>Mapped regions</span></div>
-                            <div class="viz-stat"><strong>{{ target_visualization_summary.stats.curated_region_count }}</strong><span>Curated regions</span></div>
-                            <div class="viz-stat"><strong>{{ target_visualization_summary.stats.inferred_region_count }}</strong><span>Inferred regions</span></div>
+                    <h2>Structure Availability</h2>
+                    {% if structure_status %}
+                        <div class="mini-list">
+                            <div class="mini-row"><span class="mini-label">Direct Structures</span><span class="mini-count">{{ structure_status.direct_count or 0 }}</span></div>
+                            <div class="mini-row"><span class="mini-label">Viewer Candidates</span><span class="mini-count">{{ structure_status.viewer_count or 0 }}</span></div>
                         </div>
-                        <div class="viz-note"><strong>Map status:</strong> {{ target_visualization_summary.summary_text }}</div>
-
-                        <div class="viz-breakdowns">
-                            <div class="viz-breakdown-box">
-                                <h4>Binder Categories</h4>
-                                {% if target_visualization_summary.stats.binder_type_breakdown %}
-                                    <div class="mini-list">
-                                        {% for item in target_visualization_summary.stats.binder_type_breakdown %}
-                                            <div class="mini-row"><span class="mini-label">{{ item.label }}</span><span class="mini-count">{{ item.count }}</span></div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <p class="empty">No binder category data available.</p>
-                                {% endif %}
-                            </div>
-                            <div class="viz-breakdown-box">
-                                <h4>Evidence Levels</h4>
-                                {% if target_visualization_summary.stats.evidence_breakdown %}
-                                    <div class="mini-list">
-                                        {% for item in target_visualization_summary.stats.evidence_breakdown %}
-                                            <div class="mini-row"><span class="mini-label">{{ item.label }}</span><span class="mini-count">{{ item.count }}</span></div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <p class="empty">No evidence breakdown available.</p>
-                                {% endif %}
-                            </div>
-                        </div>
+                        <p class="section-intro">{{ structure_status.message }}</p>
+                    {% else %}
+                        <p class="empty">No structure status available.</p>
                     {% endif %}
+                </div>
 
-                    {% if binding_site_annotations and binding_site_annotations|length > 0 %}
-                        <div class="binding-map-card">
+                <div class="card">
+                    <h2>Binder Relationship Snapshot</h2>
+                    {% if binder_visualization and binder_visualization.nodes %}
+                        <p class="section-intro">{{ binder_visualization.note }}</p>
+                        <div class="breakdown-grid">
+                            <div class="breakdown-box">
+                                <h3 style="margin-top:0;">Center</h3>
+                                <div class="mini-list">
+                                    <div class="mini-row"><span class="mini-label">Binder</span><span class="mini-count">{{ binder_visualization.center_label }}</span></div>
+                                    <div class="mini-row"><span class="mini-label">Type</span><span class="mini-count">{{ binder_visualization.center_type }}</span></div>
+                                </div>
+                            </div>
+                            <div class="breakdown-box">
+                                <h3 style="margin-top:0;">Connections</h3>
+                                <div class="mini-list">
+                                    {% for item in binder_visualization.legend %}
+                                        <div class="mini-row"><span class="mini-label">{{ item.label }}</span><span class="mini-count">{{ item.count }}</span></div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="list" style="margin-top:14px;">
+                            {% for node in binder_visualization.nodes %}
+                                <div class="list-item">
+                                    <h3><a href="{{ node.href }}">{{ node.full_label }}</a></h3>
+                                    <p><strong>Category:</strong> {{ node.subtitle }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No relationship snapshot is available for this binder.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Disease Category Breakdown</h2>
+                    {% if disease_category_breakdown %}
+                        <div class="mini-list">
+                            {% for item in disease_category_breakdown %}
+                                <div class="mini-row">
+                                    <span class="mini-label">{{ item.label }}</span>
+                                    <span class="mini-count">{{ item.count }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No disease breakdown available.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Clinical Trial Phase Breakdown</h2>
+                    {% if trial_phase_breakdown %}
+                        <div class="mini-list">
+                            {% for item in trial_phase_breakdown %}
+                                <div class="mini-row">
+                                    <span class="mini-label">{{ item.label }}</span>
+                                    <span class="mini-count">{{ item.count }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty">No trial phase breakdown available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Binder-Target Binding Site Map</h2>
+            <p class="section-intro">
+                This section shows the target proteins linked to this binder and highlights known or inferred binding regions on each target sequence.
+            </p>
+
+            {% if binder_binding_maps and binder_binding_maps|length > 0 %}
+                <div class="binding-map-list" id="binding-map-list">
+                    {% for mapping in binder_binding_maps %}
+                        <div class="binding-map-card binding-map-item {% if loop.index > 5 %}is-hidden{% endif %}">
                             <div class="binding-map-header">
                                 <div>
-                                    <h3>{{ protein.gene_symbol or protein.protein_name }}</h3>
-                                    <p>{{ protein.protein_name }}{% if protein.uniprot_accession %} · UniProt: {{ protein.uniprot_accession }}{% endif %}</p>
-                                    <p><strong>Sequence length:</strong> {{ protein.sequence_length or 'Not available' }}</p>
+                                    <h3>
+                                        <a href="/protein/{{ mapping.protein_id }}">{{ mapping.gene_symbol or mapping.protein_name or 'Unknown target' }}</a>
+                                    </h3>
+                                    <p>{{ mapping.protein_name or 'Target protein' }}{% if mapping.uniprot_accession %} · UniProt: {{ mapping.uniprot_accession }}{% endif %}</p>
+                                    <p><strong>Sequence length:</strong> {{ mapping.sequence_length or 'Not available' }}</p>
                                 </div>
-                                <span class="map-mode-badge">{{ binding_site_mode }}</span>
+                                <span class="map-mode-badge">{{ binder_binding_mode or 'Binding Map' }}</span>
                             </div>
 
-                            <div class="protein-ruler" aria-label="Binding site map for {{ protein.gene_symbol or protein.protein_name }}">
+                            <div class="protein-ruler" aria-label="Binding site map for {{ mapping.gene_symbol or mapping.protein_name }}">
                                 <div class="protein-axis"></div>
-                                {% for ann in binding_site_annotations %}
-                                    <div class="binding-segment binding-map-item {% if ann.inferred %}inferred{% endif %} {% if loop.index > 5 %}is-hidden{% endif %}"
-                                         title="{{ ann.binder_name }}: {{ ann.region_start }}-{{ ann.region_end }}"
-                                         style="--left: {{ ann.left_percent }}%; --width: {{ ann.width_percent }}%; --segment-color: {{ ann.color_hex }};"></div>
-                                    <div class="binding-label binding-map-item {% if loop.index > 5 %}is-hidden{% endif %}" style="--center: {{ ann.center_percent }}%;">{{ ann.region_start }}–{{ ann.region_end }}</div>
+                                {% for ann in mapping.annotations %}
+                                    <span class="binding-segment" style="--left: {{ ann.left_percent }}%; --width: {{ ann.width_percent }}%; --segment-color: {{ ann.color_hex or '#dc2626' }};"></span>
+                                    <span class="binding-label" style="--center: {{ ann.center_percent }}%;">{{ ann.region_start }}-{{ ann.region_end }}</span>
                                 {% endfor %}
                             </div>
 
-                            <div class="annotation-list" id="binding-annotation-list" data-page-size="5">
-                                {% for ann in binding_site_annotations %}
-                                    <div class="annotation-item binding-annotation-item {% if loop.index > 5 %}is-hidden{% endif %}">
-                                        <div class="annotation-topline">
-                                            <span class="annotation-dot" style="--segment-color: {{ ann.color_hex }};"></span>
-                                            <a href="/binder/{{ ann.binder_id }}">{{ ann.binder_name }}</a>
+                            {% if mapping.annotations %}
+                                <div class="annotation-list">
+                                    {% for ann in mapping.annotations %}
+                                        <div class="annotation-item">
+                                            <div class="annotation-topline">
+                                                <span class="annotation-dot" style="--segment-color: {{ ann.color_hex or '#dc2626' }};"></span>
+                                                {{ ann.region_label or 'Binding region' }}
+                                            </div>
+                                            <p><strong>Residues:</strong> {{ ann.region_start }}-{{ ann.region_end }}</p>
+                                            <p><strong>Evidence:</strong> {{ ann.evidence_type or 'Not available' }}{% if ann.inferred %} · Inferred{% endif %}</p>
+                                            <p>{{ ann.source_note or 'No source note available.' }}</p>
                                         </div>
-                                        <p><strong>Binder type:</strong> {{ ann.binder_type or 'Not available' }}</p>
-                                        <p><strong>Mapped region:</strong> {{ ann.region_start }}–{{ ann.region_end }}</p>
-                                        <p><strong>Region label:</strong> {{ ann.region_label }}</p>
-                                        <p><strong>Evidence:</strong>
-                                            <span class="evidence-pill {% if ann.inferred %}inferred{% else %}curated{% endif %}">
-                                                {{ ann.evidence_type }}
-                                            </span>
-                                        </p>
-                                        <p><strong>Data confidence:</strong> {{ ann.confidence_label or 'Not available' }}</p>
-                                        {% if ann.source_note %}<p>{{ ann.source_note }}</p>{% endif %}
-                                    </div>
-                                {% endfor %}
-                            </div>
-
-                            {% if binding_site_annotations|length > 5 %}
-                                <div class="show-more-panel" id="binding-annotation-controls">
-                                    <span class="show-more-status" id="binding-annotation-status">
-                                        Showing 5 of {{ binding_site_annotations|length }} binders
-                                    </span>
-                                    <button type="button" class="show-more-button" id="binding-annotation-show-more">
-                                        Show More Binders
-                                    </button>
+                                    {% endfor %}
                                 </div>
                             {% endif %}
                         </div>
-                    {% else %}
-                        <p class="empty">No target-binder binding annotations are available for this protein yet.</p>
-                    {% endif %}
+                    {% endfor %}
                 </div>
-                <div class="card">
-                    <h2>3D Binding-Site Highlighting</h2>
-                    <p class="section-intro">
-                        This viewer loads a protein structure and highlights the mapped binder interaction regions directly on the 3D model.
-                        It uses curated binding-site data when available and inferred regions when exact residue-level annotations are not stored yet.
-                    </p>
+                {% if binder_binding_maps|length > 5 %}
+                    <div class="show-more-panel">
+                        <span class="show-more-status" id="binding-map-status">Showing 5 of {{ binder_binding_maps|length }} target maps</span>
+                        <button type="button" class="show-more-button" id="binding-map-show-more">Show More Binding Maps</button>
+                    </div>
+                {% endif %}
+            {% else %}
+                <p class="empty">No binder-target binding annotations are available for this binder yet.</p>
+            {% endif %}
+        </div>
 
-                    {% if structure_candidates and structure_candidates|length > 0 and binding_site_annotations and binding_site_annotations|length > 0 %}
-                        <div
-                            class="three-d-card"
-                            data-binding-3d-viewer
-                            data-structures='{{ structure_candidates|tojson }}'
-                            data-annotations='{{ binding_site_annotations|tojson }}'
-                        >
-                            <div class="three-d-toolbar">
-                                <div>
-                                    <strong>Structure source</strong>
-                                    <p style="margin:4px 0 0;color:#64748b;">
-                                        Select a linked PDB structure or fallback AlphaFold model.
-                                    </p>
-                                </div>
+        <div class="card">
+            <h2>3D Binding-Site Highlighting</h2>
+            <p class="section-intro">
+                This interactive viewer attempts to load the selected structure and highlight the residue ranges associated with this binder. If external structure loading fails, the 2D map above remains available.
+            </p>
 
-                                <select class="three-d-select" data-structure-select></select>
-                            </div>
-
-                            <div class="three-d-viewer" data-structure-viewer></div>
-
-                            <div class="three-d-status loading" data-structure-status>
-                                Preparing 3D structure viewer...
-                            </div>
-
-                            <div class="three-d-annotation-list" data-annotation-list data-page-size="5"></div>
-
-                            <div class="show-more-panel" data-three-d-annotation-controls hidden>
-                                <span class="show-more-status" data-three-d-annotation-status>Showing 5 binding regions</span>
-                                <button type="button" class="show-more-button" data-three-d-annotation-show-more>
-                                    Show More 3D Binding Sites
-                                </button>
+            {% if structure_candidates and binder_3d_annotations %}
+                <div
+                    class="binding-3d-viewer"
+                    data-binding-3d-viewer
+                    data-structures='{{ structure_candidates|tojson }}'
+                    data-annotations='{{ binder_3d_annotations|tojson }}'
+                >
+                    <div class="viewer-shell">
+                        <div class="viewer-sidebar">
+                            <select class="viewer-select" data-structure-select></select>
+                            <div class="viewer-meta">
+                                <h3>Highlighted Binding Regions</h3>
+                                <p class="section-intro">{{ binding_region_summary or 'Binding regions are shown when region annotations are available.' }}</p>
+                                <p data-structure-status class="three-d-status loading">Preparing viewer...</p>
                             </div>
                         </div>
-                    {% else %}
-                        <p class="empty">
-                            3D highlighting needs both a structure candidate and binding-site annotations.
-                            The 2D binding map is still available for this target.
-                        </p>
-                    {% endif %}
+                        <div class="viewer-frame-wrap">
+                            <div class="three-d-viewer" data-structure-viewer></div>
+                        </div>
+                    </div>
+                    <div class="three-d-annotation-list" data-annotation-list data-page-size="5"></div>
+                    <div class="show-more-panel" data-three-d-annotation-controls hidden>
+                        <span class="show-more-status" data-three-d-annotation-status></span>
+                        <button type="button" class="show-more-button" data-three-d-annotation-show-more>Show More 3D Binding Sites</button>
+                    </div>
                 </div>
+            {% else %}
+                <p class="empty">No 3D binding-site annotations are available for this binder yet.</p>
+            {% endif %}
+        </div>
 
-
+        <div class="main-grid">
+            <div class="stack">
                 <div class="card">
-                    <h2>Linked Binders</h2>
-                    {% if binders and binders|length > 0 %}
-                        <div class="list show-more-list" data-page-size="5" data-show-more-label="binders">
-                            {% for binder in binders %}
-                                <div class="list-item show-more-item {% if loop.index > 5 %}is-hidden{% endif %}">
-                                    <h3><a href="/binder/{{ binder.binder_id }}">{{ binder.binder_name }}</a></h3>
-                                    <p><strong>Binder Type:</strong> {{ binder.binder_type or 'Not available' }}</p>
-                                    <p><strong>Clinical Status:</strong> {{ binder.clinical_status or binder.approval_status or 'Not available' }}</p>
-                                    <p><strong>Modality:</strong> {{ binder.modality_name or 'Not available' }}</p>
-                                    <p><strong>Interaction Type:</strong> {{ binder.interaction_type or 'Not available' }}</p>
+                    <h2>Linked Target Proteins</h2>
+                    {% if proteins and proteins|length > 0 %}
+                        <div class="list">
+                            {% for target in proteins %}
+                                <div class="list-item">
+                                    <h3><a href="/protein/{{ target.protein_id }}">{{ target.gene_symbol or target.protein_name }}</a></h3>
+                                    <p><strong>Protein:</strong> {{ target.protein_name or 'Not available' }}</p>
+                                    <p><strong>UniProt:</strong> {{ target.uniprot_accession or 'Not available' }}</p>
+                                    <p><strong>Interaction Type:</strong> {{ target.interaction_type or 'Not available' }}</p>
+                                    <p><strong>Linked Trial Count:</strong> {{ target.linked_trial_count or 0 }}</p>
                                 </div>
                             {% endfor %}
                         </div>
-                        {% if binders|length > 5 %}
-                            <div class="show-more-panel">
-                                <span class="show-more-status" data-show-more-status>Showing 5 of {{ binders|length }} binders</span>
-                                <button type="button" class="show-more-button" data-show-more-button>Show More Binders</button>
-                            </div>
-                        {% endif %}
-                        {% if binders_pagination and (binders_pagination.has_prev or binders_pagination.has_next) %}
+                        {% if proteins_pagination and (proteins_pagination.has_prev or proteins_pagination.has_next) %}
                             <div class="pagination-actions">
-                                {% if binders_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('binders_page', binders_pagination.prev_page) }}">Previous Binders</a>{% endif %}
-                                <span class="pagination-status">Showing page results {{ binders_pagination.showing }} of {{ binders_pagination.total }} binders</span>
-                                {% if binders_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('binders_page', binders_pagination.next_page) }}">Load More Binder Page</a>{% endif %}
+                                {% if proteins_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('proteins_page', proteins_pagination.prev_page) }}">Previous Targets</a>{% endif %}
+                                <span class="pagination-status">Showing {{ proteins_pagination.showing }} of {{ proteins_pagination.total }} targets</span>
+                                {% if proteins_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('proteins_page', proteins_pagination.next_page) }}">Load More Targets</a>{% endif %}
                             </div>
                         {% endif %}
                     {% else %}
-                        <p class="empty">No linked binders found.</p>
+                        <p class="empty">No linked target proteins found.</p>
                     {% endif %}
                 </div>
 
                 <div class="card">
-                    <h2>Linked Clinical Trials</h2>
+                    <h2>Associated Disease Tags</h2>
+                    <p class="section-intro">Diseases remain contextual tags, not the primary organizing structure.</p>
+                    {% if diseases and diseases|length > 0 %}
+                        <div class="tag-list">
+                            {% for disease in diseases %}
+                                <a class="tag" href="/disease/{{ disease.disease_id }}">{{ disease.disease_name }}</a>
+                            {% endfor %}
+                        </div>
+                        {% if diseases_pagination and (diseases_pagination.has_prev or diseases_pagination.has_next) %}
+                            <div class="pagination-actions">
+                                {% if diseases_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('diseases_page', diseases_pagination.prev_page) }}">Previous Diseases</a>{% endif %}
+                                <span class="pagination-status">Showing {{ diseases_pagination.showing }} of {{ diseases_pagination.total }} disease tags</span>
+                                {% if diseases_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('diseases_page', diseases_pagination.next_page) }}">Load More Diseases</a>{% endif %}
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <p class="empty">No disease tags found for this binder.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <h2>Related Binders</h2>
+                    {% if related_binders and related_binders|length > 0 %}
+                        <div class="list">
+                            {% for related in related_binders %}
+                                <div class="list-item">
+                                    <h3><a href="/binder/{{ related.binder_id }}">{{ related.binder_name }}</a></h3>
+                                    <p><strong>Type:</strong> {{ related.binder_type or 'Not available' }}</p>
+                                    <p><strong>Clinical Status:</strong> {{ related.clinical_status or 'Not available' }}</p>
+                                    <p><strong>Modality:</strong> {{ related.modality_name or 'Not available' }}</p>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        {% if related_binders_pagination and (related_binders_pagination.has_prev or related_binders_pagination.has_next) %}
+                            <div class="pagination-actions">
+                                {% if related_binders_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('related_binders_page', related_binders_pagination.prev_page) }}">Previous Related Binders</a>{% endif %}
+                                <span class="pagination-status">Showing {{ related_binders_pagination.showing }} of {{ related_binders_pagination.total }} related binders</span>
+                                {% if related_binders_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('related_binders_page', related_binders_pagination.next_page) }}">Load More Related Binders</a>{% endif %}
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <p class="empty">No related binders found.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="stack">
+                <div class="card">
+                    <h2>Clinical Trials</h2>
                     {% if trials and trials|length > 0 %}
-                        <div class="list show-more-list" data-page-size="5" data-show-more-label="trials">
+                        <div class="list">
                             {% for trial in trials %}
-                                <div class="list-item show-more-item {% if loop.index > 5 %}is-hidden{% endif %}">
-                                    <h3><a href="/trial/{{ trial.trial_id }}">{{ trial.nct_id or trial.trial_title }}</a></h3>
+                                <div class="list-item">
+                                    <h3><a href="/trial/{{ trial.trial_id }}">{{ trial.trial_title }}</a></h3>
+                                    <p><strong>NCT ID:</strong> {{ trial.nct_id or 'Not available' }}</p>
                                     <p><strong>Condition:</strong> {{ trial.condition_name or 'Not available' }}</p>
                                     <p><strong>Phase:</strong> {{ trial.phase or 'Not available' }}</p>
-                                    <p><strong>Recruitment Status:</strong> {{ trial.recruitment_status or 'Not available' }}</p>
+                                    <p><strong>Status:</strong> {{ trial.recruitment_status or 'Not available' }}</p>
+                                    <p><strong>Sponsor:</strong> {{ trial.sponsor_name or 'Not available' }}</p>
                                 </div>
                             {% endfor %}
                         </div>
-                        {% if trials|length > 5 %}
-                            <div class="show-more-panel">
-                                <span class="show-more-status" data-show-more-status>Showing 5 of {{ trials|length }} trials</span>
-                                <button type="button" class="show-more-button" data-show-more-button>Show More Trials</button>
-                            </div>
-                        {% endif %}
                         {% if trials_pagination and (trials_pagination.has_prev or trials_pagination.has_next) %}
                             <div class="pagination-actions">
                                 {% if trials_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.prev_page) }}">Previous Trials</a>{% endif %}
-                                <span class="pagination-status">Showing page results {{ trials_pagination.showing }} of {{ trials_pagination.total }} trials</span>
-                                {% if trials_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.next_page) }}">Load More Trial Page</a>{% endif %}
+                                <span class="pagination-status">Showing {{ trials_pagination.showing }} of {{ trials_pagination.total }} trials</span>
+                                {% if trials_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('trials_page', trials_pagination.next_page) }}">Load More Trials</a>{% endif %}
                             </div>
                         {% endif %}
                     {% else %}
-                        <p class="empty">No linked trials found.</p>
+                        <p class="empty">No linked clinical trials found.</p>
                     {% endif %}
                 </div>
 
                 <div class="card">
-                    <h2>Linked Structures</h2>
+                    <h2>Directly Linked Structures</h2>
                     {% if structures and structures|length > 0 %}
-                        <div class="list show-more-list" data-page-size="5" data-show-more-label="structures">
+                        <div class="list">
                             {% for structure in structures %}
-                                <div class="list-item show-more-item {% if loop.index > 5 %}is-hidden{% endif %}">
+                                <div class="list-item">
                                     <h3>{{ structure.pdb_id or 'Unknown PDB ID' }}</h3>
                                     <p><strong>Title:</strong> {{ structure.structure_title or 'Not available' }}</p>
                                     <p><strong>Experimental Method:</strong> {{ structure.experimental_method or 'Not available' }}</p>
@@ -906,21 +996,15 @@
                                 </div>
                             {% endfor %}
                         </div>
-                        {% if structures|length > 5 %}
-                            <div class="show-more-panel">
-                                <span class="show-more-status" data-show-more-status>Showing 5 of {{ structures|length }} structures</span>
-                                <button type="button" class="show-more-button" data-show-more-button>Show More Structures</button>
-                            </div>
-                        {% endif %}
                         {% if structures_pagination and (structures_pagination.has_prev or structures_pagination.has_next) %}
                             <div class="pagination-actions">
                                 {% if structures_pagination.has_prev %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.prev_page) }}">Previous Structures</a>{% endif %}
-                                <span class="pagination-status">Showing page results {{ structures_pagination.showing }} of {{ structures_pagination.total }} structures</span>
-                                {% if structures_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.next_page) }}">Load More Structure Page</a>{% endif %}
+                                <span class="pagination-status">Showing {{ structures_pagination.showing }} of {{ structures_pagination.total }} structures</span>
+                                {% if structures_pagination.has_next %}<a class="load-more-link" href="{{ pagination_url('structures_page', structures_pagination.next_page) }}">Load More Structures</a>{% endif %}
                             </div>
                         {% endif %}
                     {% else %}
-                        <p class="empty">No linked experimental structures found. The viewer may still show a fallback model.</p>
+                        <p class="empty">No direct binder structures found. The viewer may still show target-linked or predicted fallback structures.</p>
                     {% endif %}
                 </div>
             </div>
@@ -930,14 +1014,14 @@
     {% if structure_candidates and default_structure %}
     <script>
         (function () {
-            const select = document.getElementById('protein-structure-select');
-            const frame = document.getElementById('protein-structure-frame');
-            const title = document.getElementById('protein-structure-title');
-            const subtitle = document.getElementById('protein-structure-subtitle');
-            const origin = document.getElementById('protein-structure-origin');
-            const label = document.getElementById('protein-structure-label');
-            const openLink = document.getElementById('protein-structure-open');
-            const externalLink = document.getElementById('protein-structure-external');
+            const select = document.getElementById('binder-structure-select');
+            const frame = document.getElementById('binder-structure-frame');
+            const title = document.getElementById('binder-structure-title');
+            const subtitle = document.getElementById('binder-structure-subtitle');
+            const origin = document.getElementById('binder-structure-origin');
+            const label = document.getElementById('binder-structure-label');
+            const openLink = document.getElementById('binder-structure-open');
+            const externalLink = document.getElementById('binder-structure-external');
 
             if (!select) return;
 
@@ -957,61 +1041,30 @@
 
 <script>
     (function () {
-        function setupShowMoreList(list, itemSelector, button, status, label, relatedItems) {
-            if (!list || !button) return;
-
-            const pageSize = parseInt(list.dataset.pageSize || '5', 10);
-            const items = Array.from(list.querySelectorAll(itemSelector));
-            const extraItems = relatedItems || [];
+        function setupShowMore(items, button, status, label, pageSize) {
+            if (!items || !button) return;
             let visibleCount = Math.min(pageSize, items.length);
 
-            function updateVisibleItems() {
-                items.forEach((item, index) => {
-                    item.classList.toggle('is-hidden', index >= visibleCount);
-                });
-
-                extraItems.forEach((item, index) => {
-                    item.classList.toggle('is-hidden', index >= visibleCount);
-                });
-
-                if (status) {
-                    status.textContent = `Showing ${Math.min(visibleCount, items.length)} of ${items.length} ${label}`;
-                }
-
+            function update() {
+                items.forEach((item, index) => item.classList.toggle('is-hidden', index >= visibleCount));
+                if (status) status.textContent = `Showing ${Math.min(visibleCount, items.length)} of ${items.length} ${label}`;
                 button.hidden = visibleCount >= items.length;
             }
 
             button.addEventListener('click', function () {
                 visibleCount = Math.min(visibleCount + pageSize, items.length);
-                updateVisibleItems();
+                update();
             });
-
-            updateVisibleItems();
+            update();
         }
 
-        const annotationList = document.getElementById('binding-annotation-list');
-        const annotationButton = document.getElementById('binding-annotation-show-more');
-        const annotationStatus = document.getElementById('binding-annotation-status');
-        const mapItems = Array.from(document.querySelectorAll('.binding-map-item'));
-        setupShowMoreList(
-            annotationList,
-            '.binding-annotation-item',
-            annotationButton,
-            annotationStatus,
-            'binders',
-            mapItems
+        setupShowMore(
+            Array.from(document.querySelectorAll('.binding-map-item')),
+            document.getElementById('binding-map-show-more'),
+            document.getElementById('binding-map-status'),
+            'target maps',
+            5
         );
-
-        document.querySelectorAll('.show-more-list').forEach(function (list) {
-            const panel = list.nextElementSibling;
-            if (!panel || !panel.classList.contains('show-more-panel')) return;
-
-            const button = panel.querySelector('[data-show-more-button]');
-            const status = panel.querySelector('[data-show-more-status]');
-            const label = list.dataset.showMoreLabel || 'items';
-
-            setupShowMoreList(list, '.show-more-item', button, status, label);
-        });
 
         function setupThreeDShowMore() {
             const list = document.querySelector('[data-annotation-list]');
@@ -1025,14 +1078,8 @@
             let visibleCount = Math.min(pageSize, rows.length);
 
             function updateThreeDVisibleItems() {
-                rows.forEach((row, index) => {
-                    row.classList.toggle('is-hidden', index >= visibleCount);
-                });
-
-                if (status) {
-                    status.textContent = `Showing ${Math.min(visibleCount, rows.length)} of ${rows.length} 3D binding sites`;
-                }
-
+                rows.forEach((row, index) => row.classList.toggle('is-hidden', index >= visibleCount));
+                if (status) status.textContent = `Showing ${Math.min(visibleCount, rows.length)} of ${rows.length} 3D binding sites`;
                 controls.hidden = rows.length <= pageSize;
                 if (button) {
                     button.hidden = visibleCount >= rows.length;

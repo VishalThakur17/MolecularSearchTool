@@ -11,6 +11,8 @@ import requests
 import psycopg2
 import psycopg2.extras
 
+PAGE_SIZE = 5
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -317,6 +319,7 @@ def execute_search(query: str, binder_type=None, clinical_status=None, disease_n
             binder_type=binder_type,
             clinical_status=clinical_status,
             disease_name=resolved_disease_name,
+            intent_override=route_decision.get("intent"),
         )
 
     summary = build_free_summary(
@@ -335,6 +338,33 @@ def execute_search(query: str, binder_type=None, clinical_status=None, disease_n
         "summary": summary,
     }
 
+
+
+def build_free_summary(query, results, binder_type=None, clinical_status=None, disease_name=None):
+    """Create a short user-facing summary for the search page and API response."""
+    results = results or {}
+    binder_count = len(results.get("binders") or [])
+    protein_count = len(results.get("proteins") or [])
+    trial_count = len(results.get("trials") or [])
+    disease_count = len(results.get("diseases") or [])
+
+    active_filters = []
+    if binder_type:
+        active_filters.append(f"binder type: {binder_type}")
+    if clinical_status:
+        active_filters.append(f"clinical status: {clinical_status}")
+    if disease_name:
+        active_filters.append(f"disease tag: {disease_name}")
+
+    filter_text = ""
+    if active_filters:
+        filter_text = " Filters applied: " + "; ".join(active_filters) + "."
+
+    return (
+        f'Search results for "{query}": showing {binder_count} binder(s), '
+        f'{protein_count} protein target(s), {trial_count} clinical trial(s), '
+        f'and {disease_count} disease tag(s).' + filter_text
+    )
 
 def get_connection():
     return psycopg2.connect(
@@ -874,6 +904,19 @@ def infer_binding_annotations_for_protein(protein: dict, binders: list) -> list:
 
 
 def load_binding_annotations_for_protein(cur, protein: dict, binders: list) -> tuple[list, str]:
+    """Load binding annotations only for the binders currently visible on the page.
+
+    This is an important performance fix for target pages like EGFR. The old
+    version loaded every binding-site row for the protein, even when the page
+    only displayed 5 binders. For common targets, that hidden visualization
+    query can make the page feel slow.
+    """
+    binders = binders or []
+    visible_binder_ids = [b.get('binder_id') for b in binders if b.get('binder_id') is not None]
+
+    if not visible_binder_ids:
+        return [], 'none'
+
     if not table_exists(cur, 'binder_binding_sites'):
         inferred = infer_binding_annotations_for_protein(protein, binders)
         return inferred, ('inferred' if inferred else 'none')
@@ -897,8 +940,10 @@ def load_binding_annotations_for_protein(cur, protein: dict, binders: list) -> t
         JOIN proteins p ON bbs.protein_id = p.protein_id
         LEFT JOIN genes g ON p.gene_id = g.gene_id
         WHERE bbs.protein_id = %s
-        ORDER BY COALESCE(bbs.region_start, 999999), b.binder_name;
-    """, (protein.get('protein_id'),))
+          AND bbs.binder_id = ANY(%s)
+        ORDER BY COALESCE(bbs.region_start, 999999), b.binder_name
+        LIMIT %s;
+    """, (protein.get('protein_id'), visible_binder_ids, max(len(visible_binder_ids) * 3, PAGE_SIZE + 1)))
     rows = cur.fetchall() or []
     if rows:
         protein_length = _safe_int(protein.get('sequence_length'), 0) or 1000
@@ -1425,9 +1470,53 @@ def enrich_search_results(results: dict):
     return results
 
 
-def search_database(search_term: str, binder_type=None, clinical_status=None, disease_name=None):
+def search_database(
+    search_term: str,
+    binder_type=None,
+    clinical_status=None,
+    disease_name=None,
+    binder_limit=5,
+    section_limits=None,
+    intent_override=None,
+):
+    """Fast home-page search.
+
+    This version fixes the real performance issue from searches such as
+    "EGFR binders": the route stripped the word "binders" and passed only
+    "EGFR" into this function, so the function re-detected the intent as a
+    target/general search and still ran every large search query.
+
+    It also avoids broad DISTINCT/ILIKE joins when the query resolves to an
+    exact disease or target. In those cases it starts from the small link table
+    using IDs, which is much faster.
+    """
+    search_term = (search_term or "").strip()
     like_term = f"%{search_term}%"
-    intent = detect_query_intent(search_term)
+    intent = intent_override or detect_query_intent(search_term)
+    section_limits = section_limits or {}
+
+    def safe_limit(section_name, default=PAGE_SIZE):
+        try:
+            return max(int(section_limits.get(section_name, default) or default), PAGE_SIZE)
+        except (TypeError, ValueError):
+            return default
+
+    try:
+        binder_limit = max(int(binder_limit or PAGE_SIZE), PAGE_SIZE)
+    except (TypeError, ValueError):
+        binder_limit = PAGE_SIZE
+
+    limits = {
+        "binders": binder_limit,
+        "proteins": safe_limit("proteins"),
+        "trials": safe_limit("trials"),
+        "diseases": safe_limit("diseases"),
+    }
+
+    if intent == "binder":
+        sections_to_run = {"binders"}
+    else:
+        sections_to_run = {"binders", "proteins", "trials", "diseases"}
 
     results = {
         "diseases": [],
@@ -1436,195 +1525,321 @@ def search_database(search_term: str, binder_type=None, clinical_status=None, di
         "trials": [],
         "intent": intent,
         "primary_section": "binders",
-        "section_order": ["binders", "proteins", "trials", "diseases"]
+        "section_order": ["binders", "proteins", "trials", "diseases"],
     }
 
     with get_connection() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            disease_sql = """
-                SELECT DISTINCT
-                    d.disease_id,
-                    d.disease_name,
-                    d.disease_category,
-                    d.description
-                FROM diseases d
-                LEFT JOIN protein_diseases pd ON d.disease_id = pd.disease_id
-                LEFT JOIN proteins p ON pd.protein_id = p.protein_id
-                LEFT JOIN genes g ON p.gene_id = g.gene_id
-                LEFT JOIN binder_diseases bd ON d.disease_id = bd.disease_id
-                LEFT JOIN binders b ON bd.binder_id = b.binder_id
-                LEFT JOIN trial_diseases td ON d.disease_id = td.disease_id
-                LEFT JOIN clinical_trials ct ON td.trial_id = ct.trial_id
-                WHERE (
-                    d.disease_name ILIKE %s
-                    OR d.description ILIKE %s
-                    OR p.protein_name ILIKE %s
-                    OR g.gene_symbol ILIKE %s
-                    OR b.binder_name ILIKE %s
-                    OR ct.trial_title ILIKE %s
-                    OR ct.condition_name ILIKE %s
-                )
-            """
-            disease_params = [like_term, like_term, like_term, like_term, like_term, like_term, like_term]
-
+            exact_protein = get_exact_protein_match(search_term)
+            exact_disease = None
             if disease_name:
-                disease_sql += " AND d.disease_name = %s"
-                disease_params.append(disease_name)
+                exact_disease = get_exact_disease_match(disease_name)
+            if not exact_disease and intent == "disease":
+                exact_disease = get_exact_disease_match(search_term)
 
-            disease_sql += " ORDER BY d.disease_name LIMIT 20;"
-            cur.execute(disease_sql, tuple(disease_params))
-            results["diseases"] = cur.fetchall()
+            # -----------------------------
+            # Binder results
+            # -----------------------------
+            if "binders" in sections_to_run:
+                if exact_protein:
+                    binder_sql = """
+                        SELECT
+                            b.binder_id,
+                            b.binder_name,
+                            b.binder_type,
+                            b.sequence,
+                            b.clinical_status,
+                            b.mechanism_of_action,
+                            b.approval_status,
+                            bm.modality_name,
+                            1 AS rank_score
+                        FROM protein_binders pb
+                        JOIN binders b ON pb.binder_id = b.binder_id
+                        LEFT JOIN binder_modalities bm ON b.modality_id = bm.modality_id
+                        WHERE pb.protein_id = %s
+                    """
+                    binder_params = [exact_protein["protein_id"]]
+                    if binder_type:
+                        binder_sql += " AND b.binder_type = %s"
+                        binder_params.append(binder_type)
+                    if clinical_status:
+                        binder_sql += " AND b.clinical_status = %s"
+                        binder_params.append(clinical_status)
+                    if exact_disease:
+                        binder_sql += """
+                            AND EXISTS (
+                                SELECT 1
+                                FROM binder_diseases bd
+                                WHERE bd.binder_id = b.binder_id
+                                  AND bd.disease_id = %s
+                            )
+                        """
+                        binder_params.append(exact_disease["disease_id"])
+                    binder_sql += """
+                        ORDER BY
+                            CASE
+                                WHEN b.clinical_status ILIKE 'approved%%' THEN 1
+                                WHEN b.clinical_status ILIKE 'phase 4%%' THEN 2
+                                WHEN b.clinical_status ILIKE 'phase 3%%' THEN 3
+                                WHEN b.clinical_status ILIKE 'phase 2%%' THEN 4
+                                WHEN b.clinical_status ILIKE 'phase 1%%' THEN 5
+                                ELSE 6
+                            END,
+                            b.binder_name
+                        LIMIT %s;
+                    """
+                    binder_params.append(limits["binders"] + 1)
 
-            protein_sql = """
-                SELECT DISTINCT
-                    p.protein_id,
-                    p.protein_name,
-                    p.uniprot_accession,
-                    p.organism_name,
-                    p.functional_description,
-                    g.gene_symbol,
-                    g.gene_name,
-                    CASE
-                        WHEN LOWER(COALESCE(g.gene_symbol, '')) = LOWER(%s) THEN 1
-                        WHEN LOWER(COALESCE(p.protein_name, '')) = LOWER(%s) THEN 2
-                        ELSE 3
-                    END AS rank_score
-                FROM proteins p
-                LEFT JOIN genes g ON p.gene_id = g.gene_id
-                LEFT JOIN protein_diseases pd ON p.protein_id = pd.protein_id
-                LEFT JOIN diseases d ON pd.disease_id = d.disease_id
-                WHERE (
-                    p.protein_name ILIKE %s
-                    OR p.uniprot_accession ILIKE %s
-                    OR p.functional_description ILIKE %s
-                    OR g.gene_symbol ILIKE %s
-                    OR g.gene_name ILIKE %s
-                    OR d.disease_name ILIKE %s
-                )
-            """
-            protein_params = [
-                search_term, search_term,
-                like_term, like_term, like_term, like_term, like_term, like_term
-            ]
+                elif exact_disease:
+                    binder_sql = """
+                        SELECT
+                            b.binder_id,
+                            b.binder_name,
+                            b.binder_type,
+                            b.sequence,
+                            b.clinical_status,
+                            b.mechanism_of_action,
+                            b.approval_status,
+                            bm.modality_name,
+                            1 AS rank_score
+                        FROM binder_diseases bd
+                        JOIN binders b ON bd.binder_id = b.binder_id
+                        LEFT JOIN binder_modalities bm ON b.modality_id = bm.modality_id
+                        WHERE bd.disease_id = %s
+                    """
+                    binder_params = [exact_disease["disease_id"]]
+                    if binder_type:
+                        binder_sql += " AND b.binder_type = %s"
+                        binder_params.append(binder_type)
+                    if clinical_status:
+                        binder_sql += " AND b.clinical_status = %s"
+                        binder_params.append(clinical_status)
+                    binder_sql += """
+                        ORDER BY
+                            CASE
+                                WHEN b.clinical_status ILIKE 'approved%%' THEN 1
+                                WHEN b.clinical_status ILIKE 'phase 4%%' THEN 2
+                                WHEN b.clinical_status ILIKE 'phase 3%%' THEN 3
+                                WHEN b.clinical_status ILIKE 'phase 2%%' THEN 4
+                                WHEN b.clinical_status ILIKE 'phase 1%%' THEN 5
+                                ELSE 6
+                            END,
+                            b.binder_name
+                        LIMIT %s;
+                    """
+                    binder_params.append(limits["binders"] + 1)
 
-            if disease_name:
-                protein_sql += " AND d.disease_name = %s"
-                protein_params.append(disease_name)
+                else:
+                    binder_sql = """
+                        SELECT DISTINCT
+                            b.binder_id,
+                            b.binder_name,
+                            b.binder_type,
+                            b.sequence,
+                            b.clinical_status,
+                            b.mechanism_of_action,
+                            b.approval_status,
+                            bm.modality_name,
+                            CASE
+                                WHEN LOWER(COALESCE(b.binder_name, '')) = LOWER(%s) THEN 1
+                                WHEN LOWER(COALESCE(b.binder_type, '')) = LOWER(%s) THEN 2
+                                ELSE 3
+                            END AS rank_score
+                        FROM binders b
+                        LEFT JOIN binder_modalities bm ON b.modality_id = bm.modality_id
+                        LEFT JOIN binder_diseases bd ON b.binder_id = bd.binder_id
+                        LEFT JOIN diseases d ON bd.disease_id = d.disease_id
+                        LEFT JOIN protein_binders pb ON b.binder_id = pb.binder_id
+                        LEFT JOIN proteins p ON pb.protein_id = p.protein_id
+                        LEFT JOIN genes g ON p.gene_id = g.gene_id
+                        WHERE (
+                            b.binder_name ILIKE %s
+                            OR b.binder_type ILIKE %s
+                            OR b.clinical_status ILIKE %s
+                            OR b.mechanism_of_action ILIKE %s
+                            OR b.binder_description ILIKE %s
+                            OR d.disease_name ILIKE %s
+                            OR p.protein_name ILIKE %s
+                            OR g.gene_symbol ILIKE %s
+                        )
+                    """
+                    binder_params = [
+                        search_term, search_term,
+                        like_term, like_term, like_term, like_term, like_term, like_term, like_term, like_term,
+                    ]
+                    if binder_type:
+                        binder_sql += " AND b.binder_type = %s"
+                        binder_params.append(binder_type)
+                    if clinical_status:
+                        binder_sql += " AND b.clinical_status = %s"
+                        binder_params.append(clinical_status)
+                    binder_sql += " ORDER BY rank_score, b.binder_name LIMIT %s;"
+                    binder_params.append(limits["binders"] + 1)
 
-            protein_sql += " ORDER BY rank_score, p.protein_name LIMIT 20;"
-            cur.execute(protein_sql, tuple(protein_params))
-            results["proteins"] = cur.fetchall()
+                cur.execute(binder_sql, tuple(binder_params))
+                binder_rows = cur.fetchall() or []
+                has_more_binders = len(binder_rows) > limits["binders"]
+                results["binders"] = binder_rows[:limits["binders"]]
+                results["binders_pagination"] = {
+                    "showing": len(results["binders"]),
+                    "has_next": has_more_binders,
+                    "next_limit": limits["binders"] + PAGE_SIZE,
+                }
 
-            binder_sql = """
-                SELECT DISTINCT
-                    b.binder_id,
-                    b.binder_name,
-                    b.binder_type,
-                    b.sequence,
-                    b.clinical_status,
-                    b.mechanism_of_action,
-                    b.approval_status,
-                    bm.modality_name,
-                    CASE
-                        WHEN LOWER(COALESCE(b.binder_name, '')) = LOWER(%s) THEN 1
-                        WHEN LOWER(COALESCE(b.binder_type, '')) = LOWER(%s) THEN 2
-                        ELSE 3
-                    END AS rank_score
-                FROM binders b
-                LEFT JOIN binder_modalities bm ON b.modality_id = bm.modality_id
-                LEFT JOIN binder_diseases bd ON b.binder_id = bd.binder_id
-                LEFT JOIN diseases d ON bd.disease_id = d.disease_id
-                LEFT JOIN protein_binders pb ON b.binder_id = pb.binder_id
-                LEFT JOIN proteins p ON pb.protein_id = p.protein_id
-                LEFT JOIN genes g ON p.gene_id = g.gene_id
-                WHERE (
-                    b.binder_name ILIKE %s
-                    OR b.binder_type ILIKE %s
-                    OR b.clinical_status ILIKE %s
-                    OR b.mechanism_of_action ILIKE %s
-                    OR b.binder_description ILIKE %s
-                    OR d.disease_name ILIKE %s
-                    OR p.protein_name ILIKE %s
-                    OR g.gene_symbol ILIKE %s
-                )
-            """
-            binder_params = [
-                search_term, search_term,
-                like_term, like_term, like_term, like_term, like_term, like_term, like_term, like_term
-            ]
+            # -----------------------------
+            # Protein results
+            # -----------------------------
+            if "proteins" in sections_to_run:
+                if exact_disease:
+                    protein_sql = """
+                        SELECT DISTINCT
+                            p.protein_id,
+                            p.protein_name,
+                            p.uniprot_accession,
+                            p.organism_name,
+                            p.functional_description,
+                            g.gene_symbol,
+                            g.gene_name,
+                            1 AS rank_score
+                        FROM protein_diseases pd
+                        JOIN proteins p ON pd.protein_id = p.protein_id
+                        LEFT JOIN genes g ON p.gene_id = g.gene_id
+                        WHERE pd.disease_id = %s
+                        ORDER BY p.protein_name
+                        LIMIT %s;
+                    """
+                    protein_params = [exact_disease["disease_id"], limits["proteins"] + 1]
+                else:
+                    protein_sql = """
+                        SELECT DISTINCT
+                            p.protein_id,
+                            p.protein_name,
+                            p.uniprot_accession,
+                            p.organism_name,
+                            p.functional_description,
+                            g.gene_symbol,
+                            g.gene_name,
+                            CASE
+                                WHEN LOWER(COALESCE(g.gene_symbol, '')) = LOWER(%s) THEN 1
+                                WHEN LOWER(COALESCE(p.protein_name, '')) = LOWER(%s) THEN 2
+                                ELSE 3
+                            END AS rank_score
+                        FROM proteins p
+                        LEFT JOIN genes g ON p.gene_id = g.gene_id
+                        WHERE (
+                            p.protein_name ILIKE %s
+                            OR p.uniprot_accession ILIKE %s
+                            OR p.functional_description ILIKE %s
+                            OR g.gene_symbol ILIKE %s
+                            OR g.gene_name ILIKE %s
+                        )
+                        ORDER BY rank_score, p.protein_name
+                        LIMIT %s;
+                    """
+                    protein_params = [
+                        search_term, search_term,
+                        like_term, like_term, like_term, like_term, like_term,
+                        limits["proteins"] + 1,
+                    ]
+                cur.execute(protein_sql, tuple(protein_params))
+                results["proteins"] = cur.fetchall() or []
 
-            if binder_type:
-                binder_sql += " AND b.binder_type = %s"
-                binder_params.append(binder_type)
+            # -----------------------------
+            # Trial results
+            # -----------------------------
+            if "trials" in sections_to_run:
+                if exact_disease:
+                    trial_sql = """
+                        SELECT DISTINCT
+                            ct.trial_id,
+                            ct.nct_id,
+                            ct.trial_title,
+                            ct.condition_name,
+                            ct.phase,
+                            ct.recruitment_status,
+                            1 AS rank_score
+                        FROM trial_diseases td
+                        JOIN clinical_trials ct ON td.trial_id = ct.trial_id
+                        WHERE td.disease_id = %s
+                        ORDER BY ct.trial_title
+                        LIMIT %s;
+                    """
+                    trial_params = [exact_disease["disease_id"], limits["trials"] + 1]
+                else:
+                    trial_sql = """
+                        SELECT DISTINCT
+                            ct.trial_id,
+                            ct.nct_id,
+                            ct.trial_title,
+                            ct.condition_name,
+                            ct.phase,
+                            ct.recruitment_status,
+                            CASE
+                                WHEN LOWER(COALESCE(ct.nct_id, '')) = LOWER(%s) THEN 1
+                                WHEN LOWER(COALESCE(ct.trial_title, '')) = LOWER(%s) THEN 2
+                                ELSE 3
+                            END AS rank_score
+                        FROM clinical_trials ct
+                        WHERE (
+                            ct.trial_title ILIKE %s
+                            OR ct.condition_name ILIKE %s
+                            OR ct.nct_id ILIKE %s
+                            OR ct.brief_summary ILIKE %s
+                        )
+                        ORDER BY rank_score, ct.trial_title
+                        LIMIT %s;
+                    """
+                    trial_params = [search_term, search_term, like_term, like_term, like_term, like_term, limits["trials"] + 1]
+                cur.execute(trial_sql, tuple(trial_params))
+                results["trials"] = cur.fetchall() or []
 
-            if clinical_status:
-                binder_sql += " AND b.clinical_status = %s"
-                binder_params.append(clinical_status)
+            # -----------------------------
+            # Disease results
+            # -----------------------------
+            if "diseases" in sections_to_run:
+                if exact_disease:
+                    disease_sql = """
+                        SELECT
+                            d.disease_id,
+                            d.disease_name,
+                            d.disease_category,
+                            d.description,
+                            1 AS rank_score
+                        FROM diseases d
+                        WHERE d.disease_id = %s
+                        LIMIT %s;
+                    """
+                    disease_params = [exact_disease["disease_id"], limits["diseases"] + 1]
+                else:
+                    disease_sql = """
+                        SELECT
+                            d.disease_id,
+                            d.disease_name,
+                            d.disease_category,
+                            d.description,
+                            CASE WHEN LOWER(COALESCE(d.disease_name, '')) = LOWER(%s) THEN 1 ELSE 2 END AS rank_score
+                        FROM diseases d
+                        WHERE d.disease_name ILIKE %s
+                           OR d.description ILIKE %s
+                        ORDER BY rank_score, d.disease_name
+                        LIMIT %s;
+                    """
+                    disease_params = [search_term, like_term, like_term, limits["diseases"] + 1]
+                cur.execute(disease_sql, tuple(disease_params))
+                results["diseases"] = cur.fetchall() or []
 
-            if disease_name:
-                binder_sql += " AND d.disease_name = %s"
-                binder_params.append(disease_name)
-
-            binder_sql += " ORDER BY rank_score, b.binder_name LIMIT 50;"
-            cur.execute(binder_sql, tuple(binder_params))
-            results["binders"] = cur.fetchall()
-
-            trial_sql = """
-                SELECT DISTINCT
-                    ct.trial_id,
-                    ct.nct_id,
-                    ct.trial_title,
-                    ct.condition_name,
-                    ct.phase,
-                    ct.recruitment_status,
-                    CASE
-                        WHEN LOWER(COALESCE(ct.nct_id, '')) = LOWER(%s) THEN 1
-                        WHEN LOWER(COALESCE(ct.trial_title, '')) = LOWER(%s) THEN 2
-                        ELSE 3
-                    END AS rank_score
-                FROM clinical_trials ct
-                LEFT JOIN trial_diseases td ON ct.trial_id = td.trial_id
-                LEFT JOIN diseases d ON td.disease_id = d.disease_id
-                LEFT JOIN binder_trials bt ON ct.trial_id = bt.trial_id
-                LEFT JOIN binders b ON bt.binder_id = b.binder_id
-                LEFT JOIN protein_trials pt ON ct.trial_id = pt.trial_id
-                LEFT JOIN proteins p ON pt.protein_id = p.protein_id
-                LEFT JOIN genes g ON p.gene_id = g.gene_id
-                WHERE (
-                    ct.trial_title ILIKE %s
-                    OR ct.condition_name ILIKE %s
-                    OR ct.nct_id ILIKE %s
-                    OR ct.brief_summary ILIKE %s
-                    OR d.disease_name ILIKE %s
-                    OR b.binder_name ILIKE %s
-                    OR p.protein_name ILIKE %s
-                    OR g.gene_symbol ILIKE %s
-                )
-            """
-            trial_params = [
-                search_term, search_term,
-                like_term, like_term, like_term, like_term, like_term, like_term, like_term, like_term
-            ]
-
-            if disease_name:
-                trial_sql += " AND d.disease_name = %s"
-                trial_params.append(disease_name)
-
-            trial_sql += " ORDER BY rank_score, ct.trial_title LIMIT 20;"
-            cur.execute(trial_sql, tuple(trial_params))
-            results["trials"] = cur.fetchall()
+    # Trim non-binder sections to their requested limits so the existing template
+    # pagination still works normally.
+    for section in ["proteins", "trials", "diseases"]:
+        limit = limits[section]
+        if len(results.get(section, [])) > limit:
+            results[section] = results[section][:limit]
 
     results["binders"] = decorate_binder_records(results.get("binders", []))
     results = reorder_results_by_intent(results, intent)
     results = enrich_search_results(results)
     results["binder_class_breakdown"] = summarize_binder_classes(results.get("binders", []))
     return results
-
-
-
-
-
-PAGE_SIZE = 5
 
 def get_page_param(param_name: str, default: int = 1) -> int:
     try:
@@ -1648,6 +1863,55 @@ def paginate_records(records, page: int, per_page: int = PAGE_SIZE):
         "prev_page": max(page - 1, 1),
         "next_page": page + 1,
     }
+
+
+
+def build_db_pagination(page: int, total: int, per_page: int = PAGE_SIZE):
+    page = max(int(page or 1), 1)
+    total = int(total or 0)
+    showing = min(page * per_page, total)
+    return {
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "showing": showing,
+        "has_prev": page > 1,
+        "has_next": showing < total,
+        "prev_page": max(page - 1, 1),
+        "next_page": page + 1,
+    }
+
+def fetch_db_page(cur, data_sql: str, params=(), page: int = 1, count_sql: str | None = None, count_params=None, per_page: int = PAGE_SIZE):
+    """Fetch one page without running expensive COUNT(*) queries.
+
+    The previous version executed a COUNT query for each section before loading
+    the 5 visible rows. On pages with large joins, those COUNT(*) queries can be
+    slower than the actual page query. This version fetches one extra row
+    instead. If the extra row exists, the template shows a Show More link.
+    """
+    page = max(int(page or 1), 1)
+    per_page = max(int(per_page or PAGE_SIZE), 1)
+    offset = (page - 1) * per_page
+    data_sql = data_sql.strip().rstrip(';')
+
+    cur.execute(data_sql + "\nLIMIT %s OFFSET %s;", tuple(params) + (per_page + 1, offset))
+    fetched_rows = cur.fetchall() or []
+    has_next = len(fetched_rows) > per_page
+    rows = fetched_rows[:per_page]
+    showing = offset + len(rows)
+
+    pagination = {
+        "page": page,
+        "per_page": per_page,
+        "total": f"{showing}+" if has_next else showing,
+        "showing": showing,
+        "has_prev": page > 1,
+        "has_next": has_next,
+        "prev_page": max(page - 1, 1),
+        "next_page": page + 1,
+    }
+    return rows, pagination
+
 
 def build_page_url(param_name: str, page_value: int):
     args = request.args.to_dict(flat=True)
@@ -1814,6 +2078,10 @@ def index():
     protein_sort = request.values.get("protein_sort", "relevance").strip() or "relevance"
     trial_sort = request.values.get("trial_sort", "relevance").strip() or "relevance"
     disease_sort = request.values.get("disease_sort", "relevance").strip() or "relevance"
+    try:
+        binders_limit = max(int(request.values.get("binders_limit", 5)), 5)
+    except (TypeError, ValueError):
+        binders_limit = 5
     results = None; error = None; summary = None; route_hint = None; effective_query = query
     filter_options = get_filter_options(); structure_results = None; structure_error = None
     if request.method == "POST":
@@ -1833,10 +2101,25 @@ def index():
             if route_decision.get("intent") == "sequence":
                 results = fetch_sequence_similarity_results(effective_query, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
             else:
-                results = search_database(effective_query, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
+                # Only ask the database for the records needed for the current page.
+                # This prevents broad searches like "lung cancer" from loading every
+                # related binder/trial/protein before the template renders.
+                section_limits = {
+                    "proteins": get_page_param("proteins_page") * PAGE_SIZE,
+                    "trials": get_page_param("trials_page") * PAGE_SIZE,
+                    "diseases": get_page_param("diseases_page") * PAGE_SIZE,
+                }
+                results = search_database(
+                    effective_query,
+                    binder_type=binder_type,
+                    clinical_status=clinical_status,
+                    disease_name=disease_name,
+                    binder_limit=binders_limit,
+                    section_limits=section_limits,
+                    intent_override=route_decision.get("intent"),
+                )
             results = apply_result_sorting(results, binder_sort, protein_sort, trial_sort, disease_sort)
             for section_name, page_param in [
-                ("binders", "binders_page"),
                 ("proteins", "proteins_page"),
                 ("trials", "trials_page"),
                 ("diseases", "diseases_page"),
@@ -1846,6 +2129,7 @@ def index():
                 results[section_name] = paged_items
                 results[f"{section_name}_pagination"] = pagination
                 results[f"{section_name}_page_param"] = page_param
+            results["binders_page_param"] = "binders_limit"
             summary = build_free_summary(query, results, binder_type=binder_type, clinical_status=clinical_status, disease_name=disease_name)
         except Exception as e:
             error = str(e)
@@ -1937,6 +2221,11 @@ def binders_browser():
 
 @app.route("/protein/<int:protein_id>")
 def protein_detail(protein_id):
+    binders_page = get_page_param("binders_page")
+    trials_page = get_page_param("trials_page")
+    structures_page = get_page_param("structures_page")
+    diseases_page = get_page_param("diseases_page")
+
     with get_connection() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
@@ -1958,16 +2247,27 @@ def protein_detail(protein_id):
             if not protein:
                 return "Protein not found", 404
 
-            cur.execute("""
+            diseases, diseases_pagination = fetch_db_page(
+                cur,
+                """
                 SELECT d.disease_id,d.disease_name,d.disease_category,pd.tag_reason
                 FROM protein_diseases pd
                 JOIN diseases d ON pd.disease_id = d.disease_id
                 WHERE pd.protein_id = %s
-                ORDER BY d.disease_name;
-            """, (protein_id,))
-            diseases = cur.fetchall()
+                ORDER BY d.disease_name
+                """,
+                (protein_id,),
+                diseases_page,
+                """
+                SELECT COUNT(*) AS total
+                FROM protein_diseases pd
+                WHERE pd.protein_id = %s
+                """,
+            )
 
-            cur.execute("""
+            binders, binders_pagination = fetch_db_page(
+                cur,
+                """
                 SELECT
                     b.binder_id,
                     b.binder_name,
@@ -1990,38 +2290,95 @@ def protein_detail(protein_id):
                         WHEN b.clinical_status ILIKE 'phase 1%%' THEN 5
                         ELSE 6
                     END,
-                    b.binder_name;
-            """, (protein_id,))
-            binders = cur.fetchall()
+                    b.binder_name
+                """,
+                (protein_id,),
+                binders_page,
+                """
+                SELECT COUNT(*) AS total
+                FROM protein_binders pb
+                WHERE pb.protein_id = %s
+                """,
+            )
 
-            cur.execute("""
+            trials, trials_pagination = fetch_db_page(
+                cur,
+                """
                 SELECT ct.trial_id,ct.nct_id,ct.trial_title,ct.phase,ct.recruitment_status,ct.condition_name
                 FROM protein_trials pt
                 JOIN clinical_trials ct ON pt.trial_id = ct.trial_id
                 WHERE pt.protein_id = %s
-                ORDER BY ct.trial_title;
-            """, (protein_id,))
-            trials = cur.fetchall()
+                ORDER BY ct.trial_title
+                """,
+                (protein_id,),
+                trials_page,
+                """
+                SELECT COUNT(*) AS total
+                FROM protein_trials pt
+                WHERE pt.protein_id = %s
+                """,
+            )
 
-            cur.execute("""
+            structures, structures_pagination = fetch_db_page(
+                cur,
+                """
                 SELECT s.structure_id,s.pdb_id,s.structure_title,s.experimental_method,s.resolution
                 FROM protein_structures ps
                 JOIN structures s ON ps.structure_id = s.structure_id
                 WHERE ps.protein_id = %s
-                ORDER BY s.pdb_id;
-            """, (protein_id,))
-            structures = cur.fetchall()
+                ORDER BY s.pdb_id
+                """,
+                (protein_id,),
+                structures_page,
+                """
+                SELECT COUNT(*) AS total
+                FROM protein_structures ps
+                WHERE ps.protein_id = %s
+                """,
+            )
 
+            # Important performance fix:
+            # Only build binding-site annotations for the binders visible on the current page.
+            # Previously this used every linked binder, which made EGFR and disease-related pages slow.
             binding_site_annotations, binding_site_mode = load_binding_annotations_for_protein(cur, protein, binders)
 
+            # Lightweight aggregate summaries for all linked binders without fetching every binder row.
+            cur.execute("""
+                SELECT
+                    COALESCE(b.binder_type, 'Unknown') AS binder_type,
+                    COUNT(*) AS count
+                FROM protein_binders pb
+                JOIN binders b ON pb.binder_id = b.binder_id
+                WHERE pb.protein_id = %s
+                GROUP BY COALESCE(b.binder_type, 'Unknown')
+                ORDER BY count DESC, binder_type;
+            """, (protein_id,))
+            binder_type_breakdown = [
+                {"label": row["binder_type"], "count": row["count"]}
+                for row in cur.fetchall()
+            ]
+
+            cur.execute("""
+                SELECT
+                    COALESCE(NULLIF(b.clinical_status, ''), NULLIF(b.approval_status, ''), 'Unknown') AS status,
+                    COUNT(*) AS count
+                FROM protein_binders pb
+                JOIN binders b ON pb.binder_id = b.binder_id
+                WHERE pb.protein_id = %s
+                GROUP BY COALESCE(NULLIF(b.clinical_status, ''), NULLIF(b.approval_status, ''), 'Unknown')
+                ORDER BY count DESC, status;
+            """, (protein_id,))
+            binder_status_breakdown = [
+                {"label": row["status"], "count": row["count"]}
+                for row in cur.fetchall()
+            ]
+
     binders = decorate_binder_records(binders)
-    binder_type_breakdown = summarize_binder_classes(binders)
-    binder_status_breakdown = summarize_counter(Counter((b.get("clinical_status") or b.get("approval_status") or "Unknown") for b in binders))
-    binders, binders_pagination = paginate_records(binders, get_page_param("binders_page"))
-    trials, trials_pagination = paginate_records(trials, get_page_param("trials_page"))
-    structures, structures_pagination = paginate_records(structures, get_page_param("structures_page"))
-    diseases, diseases_pagination = paginate_records(diseases, get_page_param("diseases_page"))
-    structure_candidates = build_structure_candidates(structures, fallback_uniprot=protein.get("uniprot_accession"), fallback_title=protein.get("protein_name"))
+    structure_candidates = build_structure_candidates(
+        structures,
+        fallback_uniprot=protein.get("uniprot_accession"),
+        fallback_title=protein.get("protein_name"),
+    )
     default_structure = structure_candidates[0] if structure_candidates else None
     binding_region_summary = build_binding_region_summary(binding_site_annotations, binding_site_mode)
     protein_completeness = build_record_completeness(

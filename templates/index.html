@@ -865,7 +865,13 @@
                       <div class="section-subtitle">{{ subtitle }}</div>
                     </div>
                   </div>
-                  <div class="section-count">{{ items|length }} result{% if items|length != 1 %}s{% endif %}</div>
+                  <div class="section-count">
+                    {% if section_name == 'binders' and results.binders_pagination %}
+                      Showing {{ results.binders_pagination.showing }} binder{% if results.binders_pagination.showing != 1 %}s{% endif %}
+                    {% else %}
+                      {{ items|length }} result{% if items|length != 1 %}s{% endif %}
+                    {% endif %}
+                  </div>
                 </div>
 
                 {% if items and items|length > 0 %}
@@ -925,18 +931,25 @@
                       {% endfor %}
                     {% endif %}
                   </div>
-                  {% set section_pagination = results[section_name ~ '_pagination'] %}
-                  {% set section_page_param = results[section_name ~ '_page_param'] %}
-                  {% if section_pagination and (section_pagination.has_prev or section_pagination.has_next) %}
+                  {% if section_name == 'binders' and results.binders_pagination and results.binders_pagination.has_next %}
                     <div class="pagination-actions">
-                      {% if section_pagination.has_prev %}
-                        <a class="load-more-link" href="{{ pagination_url(section_page_param, section_pagination.prev_page) }}">Previous {{ title }}</a>
-                      {% endif %}
-                      <span class="pagination-status">Showing {{ section_pagination.showing }} of {{ section_pagination.total }} {{ title|lower }}</span>
-                      {% if section_pagination.has_next %}
-                        <a class="load-more-link" href="{{ pagination_url(section_page_param, section_pagination.next_page) }}">Load More {{ title }}</a>
-                      {% endif %}
+                      <a class="load-more-link" href="{{ pagination_url('binders_limit', results.binders_pagination.next_limit) }}">Show More Binders</a>
+                      <span class="pagination-status">Showing {{ results.binders_pagination.showing }} binders</span>
                     </div>
+                  {% elif section_name != 'binders' %}
+                    {% set section_pagination = results[section_name ~ '_pagination'] %}
+                    {% set section_page_param = results[section_name ~ '_page_param'] %}
+                    {% if section_pagination and (section_pagination.has_prev or section_pagination.has_next) %}
+                      <div class="pagination-actions">
+                        {% if section_pagination.has_prev %}
+                          <a class="load-more-link" href="{{ pagination_url(section_page_param, section_pagination.prev_page) }}">Previous {{ title }}</a>
+                        {% endif %}
+                        <span class="pagination-status">Showing {{ section_pagination.showing }} of {{ section_pagination.total }} {{ title|lower }}</span>
+                        {% if section_pagination.has_next %}
+                          <a class="load-more-link" href="{{ pagination_url(section_page_param, section_pagination.next_page) }}">Load More {{ title }}</a>
+                        {% endif %}
+                      </div>
+                    {% endif %}
                   {% endif %}
                 {% else %}
                   <div class="empty-state">
