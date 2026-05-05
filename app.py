@@ -5,6 +5,15 @@ import shlex
 from functools import lru_cache
 from collections import Counter
 from difflib import SequenceMatcher
+
+try:
+    from Bio import pairwise2
+    from Bio.Align import substitution_matrices
+    BIOPYTHON_AVAILABLE = True
+except Exception:
+    pairwise2 = None
+    substitution_matrices = None
+    BIOPYTHON_AVAILABLE = False
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from dotenv import load_dotenv
 import requests
@@ -33,12 +42,9 @@ FULL_BINDER_TYPES = [
     "Peptide",
 ]
 
-# Sponsor taxonomy + a practical separate class for non-protein therapeutics.
-# Small molecules are useful clinical context, but they are not part of the
-# sponsor's protein-binder taxonomy. Keeping them separate prevents hundreds
-# of kinase inhibitors from appearing as vague "Other" entries.
-NON_PROTEIN_THERAPEUTIC_TYPES = ["Small Molecule"]
-EXTENDED_BINDER_TYPES = FULL_BINDER_TYPES + NON_PROTEIN_THERAPEUTIC_TYPES + ["Other"]
+# Full sponsor taxonomy. Non-protein therapeutics and unclear records are kept
+# in Other so the UI/filtering matches the sponsor-requested binder classes.
+EXTENDED_BINDER_TYPES = FULL_BINDER_TYPES + ["Other"]
 PRIMARY_BINDER_TYPES = FULL_BINDER_TYPES
 
 BINDER_TYPE_LABELS = {
@@ -48,8 +54,17 @@ BINDER_TYPE_LABELS = {
     "VHH": "Nanobody (VHH)",
     "Fc Fusion": "Fc Fusion",
     "Peptide": "Peptide",
-    "Small Molecule": "Small Molecule / Non-protein Therapeutic",
     "Other": "Other / Unclassified",
+}
+
+BINDER_TYPE_DEFINITIONS = {
+    "IgG": "Standard monoclonal antibody / IgG therapeutic.",
+    "Bispecific Antibody": "Engineered antibody that can bind two targets or epitopes.",
+    "ADC": "Antibody-drug conjugate with an antibody linked to a payload.",
+    "VHH": "Nanobody or VHH single-domain antibody binder.",
+    "Fc Fusion": "Protein or receptor domain fused to an Fc region.",
+    "Peptide": "Short protein/peptide binder sequence.",
+    "Other": "Unclassified, non-protein, or unsupported binder type.",
 }
 
 
@@ -71,20 +86,22 @@ def canonicalize_binder_type(value: str) -> str:
         return "ADC"
 
     if any(term in normalized for term in [
-        "bispecific", "bi specific", "dual specific", "multispecific",
-        "bite", "t cell engager", "t-cell engager", "engager"
+        "bispecific", "bi specific", "dual specific", "dual-specific", "multispecific",
+        "trispecific", "bite", "t cell engager", "t-cell engager", "engager",
+        "crossmab", "duobody", "tandab", "dart"
     ]):
         return "Bispecific Antibody"
 
     if any(term in normalized for term in [
         "nanobody", "vhh", "single domain antibody", "single-domain antibody",
-        "camelid", "sdab"
+        "camelid", "sdab", "single domain", "single-domain"
     ]):
         return "VHH"
 
     if any(term in normalized for term in [
         "fc fusion", "fc-fusion", "fusion protein", "receptor fc",
-        "receptor-fc", "fc region", "trap"
+        "receptor-fc", "fc region", "trap", "immunoadhesin",
+        "etanercept", "aflibercept", "abatacept", "belatacept", "romiplostim"
     ]):
         return "Fc Fusion"
 
@@ -100,13 +117,8 @@ def canonicalize_binder_type(value: str) -> str:
     ):
         return "IgG"
 
-    if any(term in normalized for term in [
-        "small molecule", "synthetic small molecule", "molecule",
-        "inhibitor", "tyrosine kinase inhibitor", "kinase inhibitor",
-        "drug", "compound", "chemical"
-    ]):
-        return "Small Molecule"
-
+    # Anything outside the sponsor taxonomy stays in Other instead of becoming
+    # a separate filter category.
     return "Other"
 
 
@@ -114,8 +126,6 @@ def binder_classification_family(value: str) -> str:
     binder_type = canonicalize_binder_type(value)
     if binder_type in FULL_BINDER_TYPES:
         return "Full sponsor taxonomy"
-    if binder_type == "Small Molecule":
-        return "Non-protein therapeutic context"
     return "Unresolved / other"
 
 
@@ -156,6 +166,7 @@ def build_binder_classification(binder: dict, proteins=None, trials=None, diseas
     return {
         "binder_type": binder_type,
         "binder_type_label": BINDER_TYPE_LABELS.get(binder_type, binder_type),
+        "binder_type_definition": BINDER_TYPE_DEFINITIONS.get(binder_type, ""),
         "class_family": binder.get("binder_class_family") or binder_classification_family(binder_type),
         "is_primary_class": binder_type in FULL_BINDER_TYPES,
         "linked_target_count": len(proteins),
@@ -487,20 +498,105 @@ def build_kmer_set(sequence: str, k: int = 3):
     if len(seq) < k: return {seq}
     return {seq[i:i+k] for i in range(len(seq)-k+1)}
 
-def calculate_sequence_similarity(query_sequence: str, candidate_sequence: str) -> float:
+def calculate_sequence_similarity_details(query_sequence: str, candidate_sequence: str) -> dict:
+    """
+    Compare a user FASTA/amino-acid query against a stored binder sequence.
+
+    Primary method: Biopython local alignment with BLOSUM62. This is better
+    than plain text matching because it handles substitutions, gaps, and
+    partial FASTA fragments. If Biopython is not installed, the function falls
+    back to the older k-mer/text similarity method so the app still runs.
+    """
     query = normalize_biological_sequence(query_sequence)
     candidate = normalize_biological_sequence(candidate_sequence)
-    if not query or not candidate: return 0.0
-    if query == candidate: return 1.0
+
+    empty_result = {
+        "similarity_score": 0.0,
+        "percent_identity": 0.0,
+        "query_coverage": 0.0,
+        "alignment_score": 0.0,
+        "method": "none",
+    }
+
+    if not query or not candidate:
+        return empty_result
+
+    if query == candidate:
+        return {
+            "similarity_score": 1.0,
+            "percent_identity": 100.0,
+            "query_coverage": 100.0,
+            "alignment_score": float(len(query)),
+            "method": "exact",
+        }
+
+    if BIOPYTHON_AVAILABLE:
+        try:
+            matrix = substitution_matrices.load("BLOSUM62")
+            alignments = pairwise2.align.localds(
+                query,
+                candidate,
+                matrix,
+                -10,
+                -0.5,
+                one_alignment_only=True,
+            )
+
+            if not alignments:
+                return empty_result
+
+            aligned_query, aligned_candidate, raw_score, _start, _end = alignments[0]
+
+            aligned_pairs = [
+                (q, c)
+                for q, c in zip(aligned_query, aligned_candidate)
+                if q != "-" and c != "-"
+            ]
+            aligned_query_residues = sum(1 for q in aligned_query if q != "-")
+
+            if not aligned_pairs:
+                return empty_result
+
+            matches = sum(1 for q, c in aligned_pairs if q == c)
+            percent_identity = matches / len(aligned_pairs)
+            query_coverage = aligned_query_residues / max(len(query), 1)
+            length_ratio = min(len(query), len(candidate)) / max(len(query), len(candidate), 1)
+
+            # Composite score used for ranking. Identity is most important,
+            # coverage prevents tiny local matches from ranking too high, and
+            # length ratio slightly favors comparable sequence lengths.
+            similarity_score = (0.65 * percent_identity) + (0.25 * query_coverage) + (0.10 * length_ratio)
+
+            return {
+                "similarity_score": round(min(similarity_score, 1.0), 6),
+                "percent_identity": round(percent_identity * 100, 2),
+                "query_coverage": round(query_coverage * 100, 2),
+                "alignment_score": round(float(raw_score), 2),
+                "method": "Biopython local alignment (BLOSUM62)",
+            }
+        except Exception:
+            # Fall through to safe fallback below.
+            pass
+
     query_kmers = build_kmer_set(query, 3)
     candidate_kmers = build_kmer_set(candidate, 3)
     union = query_kmers | candidate_kmers
     jaccard = (len(query_kmers & candidate_kmers) / len(union)) if union else 0.0
     sequence_ratio = SequenceMatcher(None, query, candidate).ratio()
-    length_ratio = min(len(query), len(candidate)) / max(len(query), len(candidate))
+    length_ratio = min(len(query), len(candidate)) / max(len(query), len(candidate), 1)
     containment_bonus = 0.08 if query in candidate or candidate in query else 0.0
-    score = (0.50 * sequence_ratio) + (0.35 * jaccard) + (0.15 * length_ratio) + containment_bonus
-    return round(min(score, 1.0), 6)
+    score = min((0.50 * sequence_ratio) + (0.35 * jaccard) + (0.15 * length_ratio) + containment_bonus, 1.0)
+
+    return {
+        "similarity_score": round(score, 6),
+        "percent_identity": round(sequence_ratio * 100, 2),
+        "query_coverage": round(length_ratio * 100, 2),
+        "alignment_score": round(score * 100, 2),
+        "method": "Fallback k-mer/text similarity",
+    }
+
+def calculate_sequence_similarity(query_sequence: str, candidate_sequence: str) -> float:
+    return calculate_sequence_similarity_details(query_sequence, candidate_sequence)["similarity_score"]
 
 def allowed_structure_filename(filename: str) -> bool:
     filename = (filename or "").lower()
@@ -660,7 +756,7 @@ def run_structure_similarity_search(uploaded_filename: str, uploaded_bytes: byte
 
 def fetch_sequence_similarity_results(query_sequence: str, binder_type=None, clinical_status=None, disease_name=None, limit: int = 25):
     normalized_query=normalize_biological_sequence(query_sequence)
-    results={'diseases':[],'proteins':[],'binders':[],'trials':[],'intent':'sequence','primary_section':'binders','section_order':['binders','proteins','trials','diseases'],'sequence_query':normalized_query,'sequence_query_length':len(normalized_query),'sequence_strategy':'Local sequence similarity search across stored binder FASTA sequences'}
+    results={'diseases':[],'proteins':[],'binders':[],'trials':[],'intent':'sequence','primary_section':'binders','section_order':['binders','proteins','trials','diseases'],'sequence_query':normalized_query,'sequence_query_length':len(normalized_query),'sequence_strategy':'Biopython local alignment with BLOSUM62 across stored binder FASTA sequences' if BIOPYTHON_AVAILABLE else 'Fallback k-mer/text similarity across stored binder FASTA sequences'}
     if len(normalized_query) < 12: return results
     with get_connection() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -681,9 +777,19 @@ def fetch_sequence_similarity_results(query_sequence: str, binder_type=None, cli
             for row in binder_rows:
                 candidate_sequence=normalize_biological_sequence(row.get('sequence') or '')
                 if len(candidate_sequence) < 12: continue
-                similarity=calculate_sequence_similarity(normalized_query, candidate_sequence)
-                if similarity < 0.18: continue
-                row['sequence_length']=len(candidate_sequence); row['sequence_similarity_score']=round(similarity,4); row['sequence_similarity_percent']=round(similarity*100,1); row['query_sequence_preview']=sequence_preview(normalized_query); row['matched_sequence_preview']=sequence_preview(candidate_sequence)
+                similarity_details = calculate_sequence_similarity_details(normalized_query, candidate_sequence)
+                similarity = similarity_details['similarity_score']
+                if similarity < 0.20:
+                    continue
+                row['sequence_length'] = len(candidate_sequence)
+                row['sequence_similarity_score'] = round(similarity, 4)
+                row['sequence_similarity_percent'] = round(similarity * 100, 1)
+                row['percent_identity'] = similarity_details['percent_identity']
+                row['query_coverage'] = similarity_details['query_coverage']
+                row['alignment_score'] = similarity_details['alignment_score']
+                row['sequence_similarity_method'] = similarity_details['method']
+                row['query_sequence_preview'] = sequence_preview(normalized_query)
+                row['matched_sequence_preview'] = sequence_preview(candidate_sequence)
                 scored.append(row)
             scored.sort(key=lambda item:(-item['sequence_similarity_score'], item.get('binder_name') or ''))
             top_binders=scored[:limit]; results['binders']=top_binders

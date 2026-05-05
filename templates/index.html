@@ -318,6 +318,7 @@
     }
 
     input[type="text"],
+    textarea,
     select {
       width: 100%;
       padding: 14px 16px;
@@ -331,7 +332,15 @@
       min-height: 50px;
     }
 
+    textarea {
+      resize: vertical;
+      min-height: 92px;
+      line-height: 1.45;
+      font-family: Consolas, Monaco, monospace;
+    }
+
     input[type="text"]:focus,
+    textarea:focus,
     select:focus {
       border-color: rgba(37, 99, 235, 0.4);
       box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
@@ -682,13 +691,10 @@
             <div class="search-row">
               <div class="field">
                 <label for="q">Search</label>
-                <input
+                <textarea
                   id="q"
                   name="q"
-                  type="text"
-                  value="{{ query or '' }}"
-                  placeholder="Try EGFR, EGFR binders, lung cancer, Cetuximab, a FASTA sequence, or an NCT ID"
-                />
+                  placeholder="Try EGFR, EGFR binders, lung cancer, Cetuximab, an NCT ID, or paste a FASTA sequence here">{{ query or '' }}</textarea>
               </div>
 
               <div class="field">
@@ -885,7 +891,11 @@
                           <p><span class="label">Clinical Status:</span> {{ item.clinical_status or item.approval_status or 'Not available' }}</p>
                           <p><span class="label">Modality:</span> {{ item.modality_name or 'Not available' }}</p>
                           <p><span class="label">Mechanism:</span> {{ item.mechanism_of_action or 'Not available' }}</p>
-                          {% if item.sequence_similarity_percent %}<p><span class="label">Sequence Similarity:</span> {{ item.sequence_similarity_percent }}%</p>{% endif %}
+                          {% if item.sequence_similarity_percent %}<p><span class="label">Sequence Similarity Score:</span> {{ item.sequence_similarity_percent }}%</p>{% endif %}
+                          {% if item.percent_identity %}<p><span class="label">Percent Identity:</span> {{ item.percent_identity }}%</p>{% endif %}
+                          {% if item.query_coverage %}<p><span class="label">Query Coverage:</span> {{ item.query_coverage }}%</p>{% endif %}
+                          {% if item.alignment_score %}<p><span class="label">Alignment Score:</span> {{ item.alignment_score }}</p>{% endif %}
+                          {% if item.sequence_similarity_method %}<p><span class="label">Method:</span> {{ item.sequence_similarity_method }}</p>{% endif %}
                           {% if item.matched_sequence_preview %}<p><span class="label">Matched Sequence:</span> {{ item.matched_sequence_preview }}</p>{% endif %}
                           <div class="card-tags">
                             <span class="card-tag">Binder-first result</span>

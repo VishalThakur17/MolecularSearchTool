@@ -89,19 +89,22 @@ def infer_modality(molecule_record: dict) -> str:
 
     if any(term in text for term in [
         "bispecific", "bi-specific", "bi specific", "dual-specific",
-        "dual specific", "bite", "t-cell engager", "t cell engager"
+        "dual specific", "multispecific", "trispecific", "bite",
+        "t-cell engager", "t cell engager", "crossmab", "duobody",
+        "tandab", "dart"
     ]):
         return "Bispecific Antibody"
 
     if any(term in text for term in [
         "nanobody", "vhh", "single-domain antibody", "single domain antibody",
-        "camelid", "sdab"
+        "single-domain", "single domain", "camelid", "sdab"
     ]):
         return "Nanobody / VHH"
 
     if any(term in text for term in [
         "fc fusion", "fc-fusion", "fusion protein", "receptor-fc",
-        "receptor fc", "fc region", "trap"
+        "receptor fc", "fc region", "trap", "immunoadhesin",
+        "etanercept", "aflibercept", "abatacept", "belatacept", "romiplostim"
     ]):
         return "Fc Fusion"
 
@@ -221,19 +224,22 @@ def infer_binder_type(molecule_record: dict) -> str:
 
     if any(term in text for term in [
         "bispecific", "bi-specific", "bi specific", "dual-specific",
-        "dual specific", "bite", "t-cell engager", "t cell engager"
+        "dual specific", "multispecific", "trispecific", "bite",
+        "t-cell engager", "t cell engager", "crossmab", "duobody",
+        "tandab", "dart"
     ]):
         return "Bispecific Antibody"
 
     if any(term in text for term in [
         "nanobody", "vhh", "single-domain antibody", "single domain antibody",
-        "camelid", "sdab"
+        "single-domain", "single domain", "camelid", "sdab"
     ]):
         return "VHH"
 
     if any(term in text for term in [
         "fc fusion", "fc-fusion", "fusion protein", "receptor-fc",
-        "receptor fc", "fc region", "trap"
+        "receptor fc", "fc region", "trap", "immunoadhesin",
+        "etanercept", "aflibercept", "abatacept", "belatacept", "romiplostim"
     ]):
         return "Fc Fusion"
 
@@ -253,7 +259,8 @@ def infer_binder_type(molecule_record: dict) -> str:
         return "IgG"
 
     # ChEMBL records with SMILES, chemistry properties, or molecule_type = molecule
-    # are usually small molecules. Classify them explicitly instead of vague Other.
+    # are usually non-protein therapeutics. The sponsor taxonomy does not treat
+    # these as a separate binder class, so keep them in Other.
     has_smiles = bool(molecule_structures.get("canonical_smiles"))
     has_chem_props = bool(molecule_properties.get("full_mwt") or molecule_properties.get("alogp"))
     if (
@@ -262,7 +269,7 @@ def infer_binder_type(molecule_record: dict) -> str:
         or has_smiles
         or has_chem_props
     ):
-        return "Small Molecule"
+        return "Other"
 
     return "Other"
 

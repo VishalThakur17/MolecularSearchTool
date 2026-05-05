@@ -1,20 +1,14 @@
-"""
-Normalize binders into the full sponsor-requested binder taxonomy:
-- IgG
-- Bispecific Antibody
-- ADC
-- VHH
-- Fc Fusion
-- Peptide
-- Other
+import os
+import psycopg2
+import psycopg2.extras
+from dotenv import load_dotenv
 
-Run:
-    python normalize_binder_types.py
-"""
+# Load database credentials from .env
+load_dotenv()
 
-from ingest.db import get_connection
 
-FULL_BINDER_TYPES = [
+FULL_TAXONOMY = [
+    "Small Molecule",
     "IgG",
     "Bispecific Antibody",
     "ADC",
@@ -25,172 +19,122 @@ FULL_BINDER_TYPES = [
 ]
 
 
-def normalize_binder_types():
-    updates = [
-        # Clean empty/null values first.
-        """
-        UPDATE binders
-        SET binder_type = 'Other'
-        WHERE binder_type IS NULL OR TRIM(binder_type) = '';
-        """,
+def normalize_binder_type(raw_type, name="", description="", mechanism=""):
+    text = " ".join([
+        raw_type or "",
+        name or "",
+        description or "",
+        mechanism or ""
+    ]).lower()
 
-        # Antibody-drug conjugates must be checked before IgG because many ADCs end in -mab.
-        """
-        UPDATE binders
-        SET binder_type = 'ADC'
-        WHERE
-            LOWER(COALESCE(binder_name, '')) LIKE '%emtansine%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%deruxtecan%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%vedotin%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%ozogamicin%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%tesirine%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%mafodotin%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%duocarmazine%'
-            OR LOWER(COALESCE(binder_type, '')) IN (
-                'adc',
-                'antibody-drug conjugate',
-                'antibody drug conjugate',
-                'drug conjugate'
-            )
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%antibody-drug conjugate%'
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%antibody drug conjugate%'
-            OR LOWER(COALESCE(mechanism_of_action, '')) LIKE '%antibody-drug conjugate%'
-            OR LOWER(COALESCE(mechanism_of_action, '')) LIKE '%antibody drug conjugate%';
-        """,
+    # ADC must come before Small Molecule because ADCs contain "drug"
+    if any(keyword in text for keyword in [
+        "adc",
+        "antibody-drug conjugate",
+        "antibody drug conjugate",
+        "drug conjugate",
+        "vedotin",
+        "deruxtecan",
+        "emtansine",
+        "mafodotin",
+        "duocarmycin",
+        "duocarmazine",
+        "tesirine",
+        "ozogamicin",
+        "maytansinoid",
+        "payload"
+    ]):
+        return "ADC"
 
-        # Bispecific antibodies / T-cell engagers.
-        """
-        UPDATE binders
-        SET binder_type = 'Bispecific Antibody'
-        WHERE
-            LOWER(COALESCE(binder_name, '')) LIKE '%bispecific%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%bi-specific%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%bite%'
-            OR LOWER(COALESCE(binder_type, '')) IN (
-                'bispecific',
-                'bispecific antibody',
-                'bi-specific antibody',
-                'dual-specific antibody',
-                't-cell engager',
-                't cell engager',
-                'bite'
-            )
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%bispecific%'
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%t-cell engager%'
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%t cell engager%'
-            OR LOWER(COALESCE(mechanism_of_action, '')) LIKE '%bispecific%'
-            OR LOWER(COALESCE(mechanism_of_action, '')) LIKE '%t-cell engager%'
-            OR LOWER(COALESCE(mechanism_of_action, '')) LIKE '%t cell engager%';
-        """,
+    if "bispecific" in text or "bi-specific" in text:
+        return "Bispecific Antibody"
 
-        # Nanobody / VHH.
-        """
-        UPDATE binders
-        SET binder_type = 'VHH'
-        WHERE
-            LOWER(COALESCE(binder_name, '')) LIKE '%nanobody%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%vhh%'
-            OR LOWER(COALESCE(binder_type, '')) IN (
-                'nanobody',
-                'vhh',
-                'single domain antibody',
-                'single-domain antibody',
-                'sdab'
-            )
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%nanobody%'
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%single-domain antibody%'
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%single domain antibody%';
-        """,
+    if "fc fusion" in text or "fusion protein" in text:
+        return "Fc Fusion"
 
-        # Fc fusion proteins.
-        """
-        UPDATE binders
-        SET binder_type = 'Fc Fusion'
-        WHERE
-            LOWER(COALESCE(binder_name, '')) LIKE '%fc fusion%'
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%fc-fusion%'
-            OR LOWER(COALESCE(binder_type, '')) IN (
-                'fc fusion',
-                'fc-fusion',
-                'fusion protein',
-                'receptor-fc',
-                'receptor fc'
-            )
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%fc fusion%'
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%fc-fusion%'
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%fusion protein%';
-        """,
+    if "nanobody" in text or "vhh" in text or "single-domain antibody" in text:
+        return "VHH"
 
-        # Peptides.
-        """
-        UPDATE binders
-        SET binder_type = 'Peptide'
-        WHERE
-            LOWER(COALESCE(binder_type, '')) IN (
-                'peptide',
-                'oligopeptide',
-                'protein peptide',
-                'peptidomimetic'
-            )
-            OR LOWER(COALESCE(binder_name, '')) LIKE '%peptide%'
-            OR LOWER(COALESCE(binder_description, '')) LIKE '%peptide%'
-            OR (
-                sequence IS NOT NULL
-                AND LENGTH(REGEXP_REPLACE(sequence, '[^A-Za-z]', '', 'g')) BETWEEN 2 AND 80
-                AND COALESCE(binder_type, '') NOT IN ('ADC', 'Bispecific Antibody', 'VHH', 'Fc Fusion')
-            );
-        """,
+    if "peptide" in text:
+        return "Peptide"
 
-        # General monoclonal antibodies / IgG checked after the more specific antibody categories.
-        """
-        UPDATE binders
-        SET binder_type = 'IgG'
-        WHERE
-            binder_type NOT IN ('ADC', 'Bispecific Antibody', 'VHH', 'Fc Fusion', 'Peptide')
-            AND (
-                LOWER(COALESCE(binder_name, '')) LIKE '%mab'
-                OR LOWER(COALESCE(binder_type, '')) IN (
-                    'antibody',
-                    'monoclonal antibody',
-                    'igg antibody',
-                    'mab',
-                    'igg'
+    if any(k in text for k in [
+        "monoclonal antibody",
+        "antibody",
+        "mab",
+        "imab",
+        "zumab",
+        "umab",
+        "ximab",
+        "omab"
+    ]):
+        return "IgG"
+
+    # Small Molecule should come after biologic categories
+    if any(keyword in text for keyword in [
+        "small molecule",
+        "inhibitor",
+        "kinase inhibitor",
+        "tyrosine kinase",
+        "oral drug",
+        "chemical",
+        "compound",
+        "small-molecule",
+        "drug"
+    ]):
+        return "Small Molecule"
+
+    return "Other"
+
+
+def get_connection():
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        dbname=os.getenv("DB_NAME"),
+        port=os.getenv("DB_PORT", 5432)
+    )
+
+
+def main():
+    conn = get_connection()
+
+    with conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT binder_id, binder_name, binder_type,
+                       description, mechanism_of_action
+                FROM binders;
+            """)
+            binders = cur.fetchall()
+
+            updated_count = 0
+
+            for b in binders:
+                new_type = normalize_binder_type(
+                    b["binder_type"],
+                    b["binder_name"],
+                    b.get("description"),
+                    b.get("mechanism_of_action")
                 )
-                OR LOWER(COALESCE(binder_description, '')) LIKE '%monoclonal antibody%'
-            );
-        """,
 
-        # Any legacy Small Molecule values are outside the sponsor binder taxonomy.
-        """
-        UPDATE binders
-        SET binder_type = 'Other'
-        WHERE LOWER(COALESCE(binder_type, '')) IN (
-            'small molecule',
-            'small-molecule',
-            'small_molecule',
-            'drug',
-            'compound'
-        );
-        """,
+                cur.execute("""
+                    UPDATE binders
+                    SET binder_type = %s
+                    WHERE binder_id = %s;
+                """, (new_type, b["binder_id"]))
 
-        # Final safety pass.
-        """
-        UPDATE binders
-        SET binder_type = 'Other'
-        WHERE binder_type NOT IN ('IgG', 'Bispecific Antibody', 'ADC', 'VHH', 'Fc Fusion', 'Peptide', 'Other');
-        """,
-    ]
+                updated_count += 1
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            for sql in updates:
-                cur.execute(sql)
-        conn.commit()
+    conn.close()
 
-    print("✅ Binder types normalized to full sponsor taxonomy:")
-    for item in FULL_BINDER_TYPES:
-        print(f"   - {item}")
+    print("Binder types normalized with FULL taxonomy + Small Molecule separation.")
+    print(f"Updated binders: {updated_count}")
+    print("Allowed taxonomy:")
+    for binder_type in FULL_TAXONOMY:
+        print(f"   - {binder_type}")
 
 
 if __name__ == "__main__":
-    normalize_binder_types()
+    main()
