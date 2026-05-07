@@ -513,7 +513,6 @@
         <div class="hero">
             <h1>{{ binder.binder_name or 'Binder Detail' }}</h1>
             <p class="subtitle">
-                This binder page treats the therapeutic molecule as a first-class entity. It summarizes classification, target links, disease context, clinical evidence, sequence availability, and 2D/3D binding visualization when data is available.
             </p>
             <div class="badge-row">
                 <span class="badge">Type: {{ binder.binder_type or 'Not available' }}</span>
@@ -528,7 +527,6 @@
         <div class="card">
             <h2>3D Binder/Target Structure Viewer</h2>
             <p class="section-intro">
-                This viewer uses direct binder structures when available. If no direct binder structure exists, the page uses target-linked structures or an AlphaFold fallback model when possible.
             </p>
 
             {% if structure_candidates and default_structure %}
@@ -648,7 +646,7 @@
             <div class="stack">
                 <div class="card">
                     <h2>Binder Classification</h2>
-                    <p class="section-intro">This section maps the binder into the sponsor taxonomy and shows how complete the current binder record is.</p>
+                    <p class="section-intro"></p>
 
                     {% if binder_classification %}
                         <div class="breakdown-grid">
@@ -788,7 +786,7 @@
         <div class="card">
             <h2>Binder-Target Binding Site Map</h2>
             <p class="section-intro">
-                This section shows the target proteins linked to this binder and highlights known or inferred binding regions on each target sequence.
+    
             </p>
 
             {% if binder_binding_maps and binder_binding_maps|length > 0 %}
@@ -846,7 +844,7 @@
         <div class="card">
             <h2>3D Binding-Site Highlighting</h2>
             <p class="section-intro">
-                This interactive viewer attempts to load the selected structure and highlight the residue ranges associated with this binder. If external structure loading fails, the 2D map above remains available.
+                
             </p>
 
             {% if structure_candidates and binder_3d_annotations %}
@@ -910,7 +908,7 @@
 
                 <div class="card">
                     <h2>Associated Disease Tags</h2>
-                    <p class="section-intro">Diseases remain contextual tags, not the primary organizing structure.</p>
+                    <p class="section-intro"></p>
                     {% if diseases and diseases|length > 0 %}
                         <div class="tag-list">
                             {% for disease in diseases %}
