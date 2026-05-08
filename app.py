@@ -2,6 +2,7 @@ import os
 import re
 import math
 import shlex
+import time
 from functools import lru_cache
 from collections import Counter
 from difflib import SequenceMatcher
@@ -610,7 +611,7 @@ def safe_float(value):
         return None
 
 @lru_cache(maxsize=128)
-def fetch_structure_text(url: str, timeout: int = 8) -> str:
+def fetch_structure_text(url: str, timeout: int = 4) -> str:
     response = requests.get(url, timeout=timeout)
     response.raise_for_status()
     return response.text
@@ -628,8 +629,20 @@ def parse_pdb_coordinates(text: str):
     return atoms,residues,chains
 
 def tokenize_cif_line(line: str):
-    try: return shlex.split(line, posix=False)
-    except Exception: return line.split()
+    line = line.strip()
+
+    if not line:
+        return []
+
+    # Fast path: most mmCIF atom rows do not need shlex
+    if '"' not in line and "'" not in line:
+        return line.split()
+
+    # Slow fallback only when quotes exist
+    try:
+        return shlex.split(line, posix=False)
+    except Exception:
+        return line.split()
 
 def parse_mmcif_coordinates(text: str):
     atoms=[]; residues=set(); chains=set(); lines=text.splitlines(); i=0
@@ -702,17 +715,29 @@ def run_structure_similarity_search(uploaded_filename: str, uploaded_bytes: byte
     if not uploaded_bytes:
         raise ValueError('No structure file was uploaded.')
 
+    start_time = time.time()
+    max_seconds = 20  # keep below Render/Gunicorn timeout
+
     decoded = uploaded_bytes.decode('utf-8', errors='ignore')
     query_signature = compute_structure_signature_from_text(decoded, uploaded_filename)
-    candidates = load_structure_similarity_candidates(limit=max(top_k * 2, 24))
+
+    # Keep this small on Render
+    candidates = load_structure_similarity_candidates(limit=10)
+
     matches = []
     failures = []
 
     for row in candidates:
+        if time.time() - start_time > max_seconds:
+            failures.append("Search stopped early to avoid Render timeout.")
+            break
+
         pdb_id = safe_string(row.get('pdb_id'))
         structure_url = safe_string(row.get('structure_file_url'))
+
         if not structure_url and pdb_id:
             structure_url = f'https://files.rcsb.org/download/{pdb_id.upper()}.cif'
+
         if not structure_url:
             continue
 
@@ -720,6 +745,7 @@ def run_structure_similarity_search(uploaded_filename: str, uploaded_bytes: byte
             candidate_text = fetch_structure_text(structure_url)
             candidate_signature = compute_structure_signature_from_text(candidate_text, structure_url)
             comparison = compare_structure_signatures(query_signature, candidate_signature)
+
             matches.append({
                 'structure_id': row.get('structure_id'),
                 'pdb_id': pdb_id.upper() if pdb_id else None,
@@ -735,16 +761,19 @@ def run_structure_similarity_search(uploaded_filename: str, uploaded_bytes: byte
                 'external_url': f'https://www.rcsb.org/structure/{pdb_id.upper()}' if pdb_id else structure_url,
                 **comparison,
             })
+
         except Exception as exc:
             failures.append(f"{pdb_id or structure_url}: {exc}")
 
     matches.sort(key=lambda item: item['similarity_score'], reverse=True)
     top_matches = matches[:top_k]
+
     summary = (
         f'The uploaded structure "{uploaded_filename}" was compared against {len(matches)} linked structure candidates using an MVP structural signature based on atom count, residue count, chain count, overall span, and radius of gyration. The top match scored {top_matches[0]["similarity_score"]:.2f}% similarity.'
         if top_matches else
         'The structure similarity workflow ran, but no comparable structures were available in the current dataset.'
     )
+
     return {
         'query_filename': uploaded_filename,
         'query_signature': query_signature,
