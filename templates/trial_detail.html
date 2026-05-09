@@ -457,7 +457,7 @@
                     {% if diseases and diseases|length > 0 %}
                         <div class="tag-list">
                             {% for disease in diseases %}
-                                <a class="tag" href="/disease/{{ disease.disease_id }}">{{ disease.disease_name }}</a>
+                                <a class="tag">{{ disease.disease_name }}</a>
                             {% endfor %}
                         </div>
                     {% else %}

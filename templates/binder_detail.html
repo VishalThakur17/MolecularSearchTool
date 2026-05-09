@@ -501,6 +501,26 @@
             display: none;
         }
 
+
+.sequence-box {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+
+    max-width: 100%;
+    overflow-x: hidden;
+
+    font-family: monospace;
+    line-height: 1.5;
+
+    background: #f8f9fc;
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #dfe3ea;
+    font-size: 14px;
+}
+
 </style>
 </head>
 <body>
@@ -634,7 +654,7 @@
                 <div class="card">
                     <h2>Sequence / FASTA</h2>
                     {% if binder.sequence %}
-                        <pre class="sequence-box">{{ binder.sequence }}</pre>
+                        <pre class="sequence-box">{{ binder.sequence if binder.sequence else "No sequence available." }}</pre>
                     {% elif sequence_note %}
                         <p class="empty">{{ sequence_note }}</p>
                     {% else %}
